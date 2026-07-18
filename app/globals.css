@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+/*
+  Emote AI design system — a biometric/integrity "control room" look.
+  Amber signal-brand (#F5A623) with an integrity-alert magenta (#FF3B6B) over a
+  deep near-black surface stack. Green = clean, red = flagged.
+*/
+@theme {
+  --color-base: #08090d;
+  --color-surface: #101218;
+  --color-surface-2: #171a22;
+  --color-surface-3: #20242e;
+  --color-border: #2a2f3a;
+  --color-border-bright: #3d434f;
+
+  --color-ink: #f0f2f6;
+  --color-muted: #949aa8;
+  --color-faint: #626878;
+
+  --color-primary: #f5a623; /* Emote AI amber */
+  --color-primary-dim: #d98a12;
+  --color-accent: #ff3b6b; /* integrity-alert magenta */
+  --color-accent-dim: #d62f5a;
+
+  --color-up: #22c55e;
+  --color-down: #ff4d5e;
+  --color-warn: #ffb020;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-card: 16px;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html {
+    background-color: var(--color-base);
+  }
+  body {
+    background:
+      radial-gradient(1100px 600px at 78% -8%, rgba(255, 59, 107, 0.12), transparent 60%),
+      radial-gradient(1000px 620px at 8% -12%, rgba(245, 166, 35, 0.12), transparent 58%),
+      var(--color-base);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  ::selection {
+    background: rgba(245, 166, 35, 0.28);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-base);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 6px;
+    border: 2px solid var(--color-base);
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .card {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+      var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+  .card-2 {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+  .hairline {
+    border-color: var(--color-border);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-border-bright);
+    color: var(--color-muted);
+  }
+  .chip-live {
+    color: #07120c;
+    background: var(--color-primary);
+    border-color: transparent;
+  }
+  .chip-final {
+    color: var(--color-muted);
+    background: var(--color-surface-3);
+  }
+  /* Odds button — the tappable price. */
+  .odds {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0.5rem 0.25rem;
+    border-radius: 11px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    font-variant-numeric: tabular-nums;
+    transition: all 0.14s ease;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .odds:hover {
+    border-color: var(--color-primary-dim);
+    background: var(--color-surface-3);
+  }
+  .odds[data-active="true"] {
+    border-color: var(--color-primary);
+    background: rgba(245, 166, 35, 0.12);
+    box-shadow: 0 0 0 1px var(--color-primary) inset;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 11px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.14s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dim));
+    color: #04130c;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.07);
+  }
+  .btn-ghost {
+    background: var(--color-surface-2);
+    border-color: var(--color-border-bright);
+    color: var(--color-ink);
+  }
+  .btn-ghost:hover {
+    border-color: var(--color-primary-dim);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .glow-primary {
+    box-shadow: 0 0 40px -12px rgba(245, 166, 35, 0.5);
+  }
+  .mono {
+    font-family: var(--font-mono);
+  }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.7);
+    animation: pp-pulse 1.6s infinite;
+  }
+}
+
+@keyframes pp-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.6); }
+  70% { box-shadow: 0 0 0 7px rgba(245, 166, 35, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0); }
+}
+
+/* Solana wallet-adapter button, restyled to match. */
+.wallet-adapter-button {
+  background: var(--color-surface-2) !important;
+  border: 1px solid var(--color-border-bright) !important;
+  border-radius: 11px !important;
+  height: 40px !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  color: var(--color-ink) !important;
+  padding: 0 0.9rem !important;
+}
+.wallet-adapter-button:not([disabled]):hover {
+  background: var(--color-surface-3) !important;
+  border-color: var(--color-primary-dim) !important;
+}
+.wallet-adapter-button-trigger {
+  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-dim)) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
