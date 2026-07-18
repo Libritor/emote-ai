@@ -23,7 +23,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ConnectionProvider endpoint={SOLANA_RPC}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <WalletModalProvider>
+          <div className="flex min-h-dvh flex-col">{children}</div>
+        </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

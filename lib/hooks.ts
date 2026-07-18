@@ -8,11 +8,20 @@ export interface BoardItem {
   oneXtwo: Odds1x2 | null;
 }
 
+export interface BoardResult {
+  items: BoardItem[];
+  mode: "mock" | "live" | null;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+}
+
 /** Fetch the whole board (fixtures + 1X2 prices) in one payload, polling. */
-export function useBoard(pollMs = 15000) {
+export function useBoard(pollMs = 15000): BoardResult {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [mode, setMode] = useState<"mock" | "live" | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
   const load = useCallback(async () => {
@@ -23,8 +32,9 @@ export function useBoard(pollMs = 15000) {
       if (!mounted.current) return;
       setItems(data.items);
       setMode(data.mode);
-    } catch {
-      /* keep last good data */
+      setError(null);
+    } catch (e) {
+      if (mounted.current) setError((e as Error).message);
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -32,15 +42,16 @@ export function useBoard(pollMs = 15000) {
 
   useEffect(() => {
     mounted.current = true;
-    load();
+    const initial = setTimeout(load, 0);
     const t = setInterval(load, pollMs);
     return () => {
       mounted.current = false;
+      clearTimeout(initial);
       clearInterval(t);
     };
   }, [load, pollMs]);
 
-  return { items, mode, loading, refresh: load };
+  return { items, mode, loading, error, refresh: load };
 }
 
 export interface FixturesResult {
@@ -77,10 +88,11 @@ export function useFixtures(pollMs = 15000): FixturesResult {
 
   useEffect(() => {
     mounted.current = true;
-    load();
+    const initial = setTimeout(load, 0);
     const t = setInterval(load, pollMs);
     return () => {
       mounted.current = false;
+      clearTimeout(initial);
       clearInterval(t);
     };
   }, [load, pollMs]);
@@ -93,6 +105,7 @@ export interface OddsResult {
   odds: FixtureOdds | null;
   fair: FairProbabilities | null;
   loading: boolean;
+  error: string | null;
 }
 
 export function useOdds(id: number | null, pollMs = 10000): OddsResult {
@@ -101,6 +114,7 @@ export function useOdds(id: number | null, pollMs = 10000): OddsResult {
     odds: null,
     fair: null,
     loading: true,
+    error: null,
   });
 
   useEffect(() => {
@@ -109,11 +123,11 @@ export function useOdds(id: number | null, pollMs = 10000): OddsResult {
     const load = async () => {
       try {
         const res = await fetch(`/api/txodds/odds/${id}`, { cache: "no-store" });
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error(`market ${res.status}`);
         const data = await res.json();
-        if (on) setState({ fixture: data.fixture, odds: data.odds, fair: data.fair, loading: false });
-      } catch {
-        if (on) setState((s) => ({ ...s, loading: false }));
+        if (on) setState({ fixture: data.fixture, odds: data.odds, fair: data.fair, loading: false, error: null });
+      } catch (e) {
+        if (on) setState((s) => ({ ...s, loading: false, error: (e as Error).message }));
       }
     };
     load();

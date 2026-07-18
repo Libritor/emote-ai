@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Signal, AgentSummary } from "@/lib/agent/striker";
 import { Stat } from "@/components/ui";
+import { EMPTY, formatOdds, formatProbability, formatSignedPct } from "@/lib/format";
 
 interface Position {
   key: string;
@@ -22,6 +23,7 @@ export default function Terminal() {
   const [auto, setAuto] = useState(false);
   const [positions, setPositions] = useState<Position[]>([]);
   const [log, setLog] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const booked = useRef<Set<string>>(new Set());
 
   const pushLog = useCallback((line: string) => {
@@ -31,20 +33,28 @@ export default function Terminal() {
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/agent/signals", { cache: "no-store" });
+      if (!res.ok) throw new Error(`signals ${res.status}`);
       const data = await res.json();
       setSignals(data.signals);
       setSummary(data.summary);
       setMode(data.mode);
+      setError(null);
       return data.signals as Signal[];
-    } catch {
+    } catch (e) {
+      setError((e as Error).message);
       return [] as Signal[];
     }
   }, []);
 
   useEffect(() => {
-    load().then((s) => pushLog(`Scanned feed — ${s.length} live edges detected.`));
+    const initial = setTimeout(() => {
+      load().then((s) => pushLog(`Scanned feed - ${s.length} live edges detected.`));
+    }, 0);
     const t = setInterval(load, 12000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(t);
+    };
   }, [load, pushLog]);
 
   // Auto-execute: book the strongest fresh edges into the blotter.
@@ -65,7 +75,7 @@ export default function Terminal() {
       };
       setPositions((p) => [pos, ...p].slice(0, 30));
       pushLog(
-        `EXECUTE ${s.match} · ${s.pickLabel} @ ${s.odds.toFixed(2)} — stake ${(s.kelly * 100).toFixed(1)}% (edge +${(s.ev * 100).toFixed(1)}%)`,
+        `EXECUTE ${s.match} - ${s.pickLabel} @ ${formatOdds(s.odds)} - stake ${formatProbability(s.kelly, 1)} (edge ${formatSignedPct(s.ev)})`,
       );
     }
   }, [auto, signals, pushLog]);
@@ -82,7 +92,9 @@ export default function Terminal() {
           </span>
           <div>
             <div className="font-black">Sentinel</div>
-            <div className="text-xs text-muted">Autonomous edge-taking agent · feed: {mode}</div>
+            <div className="text-xs text-muted">
+              Autonomous edge-taking agent - {mode === "live" ? "live feed" : mode === "mock" ? "simulated feed" : "feed unavailable"}
+            </div>
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
@@ -90,24 +102,30 @@ export default function Terminal() {
             <span className={auto ? "text-primary" : "text-faint"}>{auto ? "● Running" : "○ Idle"}</span>
           </div>
           <button onClick={() => setAuto((a) => !a)} className={`btn ${auto ? "btn-ghost" : "btn-primary"}`}>
-            {auto ? "Pause agent" : "Run agent →"}
+            {auto ? "Pause agent" : "Run agent ->"}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Markets scanned" value={summary?.scanned ?? "—"} />
-        <Stat label="Edges found" value={summary?.edgesFound ?? "—"} />
-        <Stat label="Best edge" value={summary ? `+${(summary.bestEv * 100).toFixed(1)}%` : "—"} />
-        <Stat label="Booked edge" value={`+${(totalEdge * 100).toFixed(2)}%`} sub={`${positions.length} positions`} />
+        <Stat label="Markets scanned" value={summary?.scanned ?? EMPTY} />
+        <Stat label="Edges found" value={summary?.edgesFound ?? EMPTY} />
+        <Stat label="Best edge" value={summary ? formatSignedPct(summary.bestEv) : EMPTY} />
+        <Stat label="Booked edge" value={formatSignedPct(totalEdge)} sub={`${positions.length} positions`} />
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-2.5 text-xs text-warn">
+          Sentinel feed unavailable. Retrying in the background.
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
         {/* Signals */}
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="font-black">Live edges</div>
-            <div className="text-xs text-faint">market price vs model-fair · ranked by EV</div>
+            <div className="text-xs text-faint">market price vs model fair - ranked by EV</div>
           </div>
           <div className="max-h-[520px] overflow-y-auto">
             <table className="w-full text-sm">
@@ -122,22 +140,22 @@ export default function Terminal() {
               </thead>
               <tbody>
                 {signals.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-muted">Scanning…</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-10 text-center text-muted">{error ? "Unable to load edges." : "Scanning…"}</td></tr>
                 ) : (
                   signals.map((s) => (
                     <tr key={`${s.fixtureId}:${s.pick}`} className="border-t border-border/60 hover:bg-surface-2">
                       <td className="px-4 py-2.5">
-                        <Link href={`/markets/${s.fixtureId}`} className="mono font-semibold hover:text-primary">
+                        <Link href="/markets" className="mono font-semibold hover:text-primary">
                           {s.match}
                         </Link>
                         {s.status === "live" && <span className="ml-2 text-[10px] font-bold text-primary">LIVE</span>}
                       </td>
                       <td className="px-2 py-2.5 max-w-[120px] truncate">{s.pickLabel}</td>
-                      <td className="px-2 py-2.5 text-right mono">{s.odds.toFixed(2)}</td>
-                      <td className="px-2 py-2.5 text-right mono text-muted">{(s.fairProb * 100).toFixed(0)}%</td>
+                      <td className="px-2 py-2.5 text-right mono">{formatOdds(s.odds)}</td>
+                      <td className="px-2 py-2.5 text-right mono text-muted">{formatProbability(s.fairProb)}</td>
                       <td className="px-4 py-2.5 text-right">
                         <span className={`chip ${s.confidence === "high" ? "chip-live" : ""}`}>
-                          +{(s.ev * 100).toFixed(1)}%
+                          {formatSignedPct(s.ev)}
                         </span>
                       </td>
                     </tr>
@@ -162,11 +180,11 @@ export default function Terminal() {
                   <div key={p.key} className="flex items-center justify-between border-t border-border/60 px-4 py-2.5 text-sm">
                     <div className="min-w-0">
                       <div className="mono font-semibold">{p.match}</div>
-                      <div className="truncate text-xs text-faint">{p.pick} @ {p.odds.toFixed(2)}</div>
+                      <div className="truncate text-xs text-faint">{p.pick} @ {formatOdds(p.odds)}</div>
                     </div>
                     <div className="text-right">
-                      <div className="mono text-xs">{(p.stakePct * 100).toFixed(1)}% stake</div>
-                      <div className="text-xs text-up">+{(p.ev * 100).toFixed(1)}% EV</div>
+                      <div className="mono text-xs">{formatProbability(p.stakePct, 1)} stake</div>
+                      <div className="text-xs text-up">{formatSignedPct(p.ev)} EV</div>
                     </div>
                   </div>
                 ))
@@ -192,9 +210,9 @@ export default function Terminal() {
       </div>
 
       <p className="text-xs text-faint">
-        Strategy is fully deterministic and inspectable — Sentinel only ever books positive
+        Strategy is fully deterministic and inspectable - Sentinel only ever books positive
         expected-value edges (market price cheaper than model-fair) at a capped half-Kelly stake.
-        On devnet it executes these via the PitchProof program; here it books them to a paper blotter.
+        This page simulates booking to a paper blotter while on-chain execution is limited to the market detail flow.
       </p>
     </div>
   );

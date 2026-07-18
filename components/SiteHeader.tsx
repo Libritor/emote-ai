@@ -22,7 +22,7 @@ const NAV = [
 export default function SiteHeader() {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-base/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border bg-base">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <EmoteLogo />
@@ -62,9 +62,8 @@ export default function SiteHeader() {
 
 function EmoteLogo() {
   return (
-    <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-gradient-to-br from-primary to-accent glow-primary">
+    <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-primary">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
-        {/* face + pulse */}
         <circle cx="12" cy="12" r="9" stroke="#1a0f02" strokeWidth="2" />
         <path d="M8 14c1 1.5 2.4 2.2 4 2.2s3-.7 4-2.2" stroke="#1a0f02" strokeWidth="2" strokeLinecap="round" />
         <path d="M8.5 9.5h.01M15.5 9.5h.01" stroke="#1a0f02" strokeWidth="2.4" strokeLinecap="round" />

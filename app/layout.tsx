@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jetbrains = JetBrains_Mono({
@@ -12,9 +13,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Emote AI — On-chain match integrity for the World Cup",
+  title: "Emote AI - On-chain match integrity for the World Cup",
   description:
-    "Emote AI reads the faces of referees and players — heart rate, stress, expression — into an experimental, on-chain 'integrity' signal powering prediction markets, a fan watchdog room, and a trading sentinel on Solana.",
+    "Emote AI reads the faces of referees and players - heart rate, stress, expression - into an experimental integrity signal shown alongside prediction markets, fan picks, and a trading sentinel on Solana.",
 };
 
 export default function RootLayout({
@@ -25,7 +26,8 @@ export default function RootLayout({
       <body>
         <Providers>
           <SiteHeader />
-          {children}
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
         </Providers>
       </body>
     </html>

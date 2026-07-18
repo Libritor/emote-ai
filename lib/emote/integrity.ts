@@ -1,16 +1,18 @@
-// Integrity Signal — an EXPERIMENTAL "suspicion" heuristic for entertainment.
+import { asScore100 } from "@/lib/format";
+
+// Integrity Signal - an EXPERIMENTAL "suspicion" heuristic for entertainment.
 //
 // ⚠ HONEST SCOPE (load-bearing): this is NOT a lie detector and NOT evidence of
 // any real wrongdoing. Facial/physiological deception detection is not
-// scientifically reliable — the Emote AI signal-processing authors deliberately
+// scientifically reliable - the Emote AI signal-processing authors deliberately
 // refuse to ship a "guilt" score for exactly this reason. We surface it here
 // only as a transparent, auditable, on-chain crowd-entertainment signal for the
 // World Cup: a "suspicion meter" you can point at a ref or player for fun. Every
-// number is interpretable and published on-chain so it can be challenged — the
+// number is interpretable and published on-chain so it can be challenged - the
 // transparency is the whole point.
 
 export const INTEGRITY_DISCLAIMER =
-  "Experimental heuristic for entertainment only — NOT a lie detector and not evidence of " +
+  "Experimental heuristic for entertainment only - NOT a lie detector and not evidence of " +
   "wrongdoing. Facial/physiological deception detection is not scientifically reliable.";
 
 export interface EmotionProbs {
@@ -74,17 +76,17 @@ export function computeIntegrity(input: IntegrityInput): IntegrityReading {
   else if (suspicion >= 30) label = "Nervous";
 
   return {
-    suspicion,
-    guilt: Math.round(guilt * 100),
-    tells: Math.round(tells * 100),
-    masking: Math.round(masking * 100),
+    suspicion: asScore100(suspicion),
+    guilt: asScore100(guilt * 100),
+    tells: asScore100(tells * 100),
+    masking: asScore100(masking * 100),
     label,
-    confidence: Math.round(quality),
+    confidence: asScore100(quality),
   };
 }
 
 /**
- * A deterministic per-match "integrity" reading for the demo — stands in for the
+ * A deterministic per-match "integrity" reading for the demo - stands in for the
  * aggregate on-chain integrity attestation the oracle would write from live
  * Ref-Cam analysis. Seeded by match id so it's stable. Experimental heuristic.
  */

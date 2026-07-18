@@ -12,11 +12,11 @@ export interface Attestation {
   home: string;
   away: string;
   kickoff: string;
-  outcome: "1" | "X" | "2";
+  outcome: "1" | "X" | "2" | "?";
   score: string; // "h-a"
   /** Canonical string that gets hashed. */
   canonical: string;
-  /** sha256 hex of `canonical` — stored on-chain as [u8;32]. */
+  /** sha256 hex of `canonical` - stored on-chain as [u8;32]. */
   dataHash: string;
 }
 
@@ -41,7 +41,7 @@ export function attest(f: Fixture): Attestation {
     home: f.home.code,
     away: f.away.code,
     kickoff: f.kickoff,
-    outcome: (f.outcome ?? "X") as "1" | "X" | "2",
+    outcome: f.outcome ?? "?",
     score: f.score ? `${f.score.home}-${f.score.away}` : "0-0",
     canonical,
     dataHash,

@@ -1,4 +1,5 @@
-// Oracle relayer: reads the TxODDS feed (mock) and writes each match's current
+// Oracle relayer: reads the TxODDS feed (mock or live TxLINE, per TXODDS_MODE)
+// and writes each match's current
 // state — teams, status, score, outcome, and a sha256 data hash — into the
 // on-chain match account. Final matches are settled. This is the exact data the
 // markets resolve against and the Verify page recomputes.
@@ -8,7 +9,7 @@
 import { SystemProgram } from "@solana/web3.js";
 import { getContext } from "./setup";
 import { oraclePda, matchPda } from "../../lib/solana/pda";
-import { MockTxOddsProvider, trueResult } from "../../lib/txodds/mock";
+import { getTxOdds } from "../../lib/txodds";
 import { attest } from "../../lib/oracle/attest";
 
 const STATUS = { scheduled: 0, live: 1, final: 2 } as const;
@@ -25,7 +26,8 @@ async function main() {
   const { program, kp } = getContext();
   const [oracle] = oraclePda(program.programId);
 
-  const provider = new MockTxOddsProvider();
+  const provider = getTxOdds();
+  console.log(`relayer: feed mode = ${provider.mode}`);
   const fixtures = await provider.getFixtures();
   // Push matches that have kicked off (live/final) first — those are settle-able
   // and interesting to show; cap at `limit` to keep devnet costs sane.
@@ -38,9 +40,9 @@ async function main() {
   for (const f of targets) {
     const [matchData] = matchPda(program.programId, f.id);
     const a = attest(f);
-    // For final matches, use the true result; else current (possibly partial) score.
-    const res = f.status === "final" ? trueResult(f.id) : null;
-    const outcome = f.status === "final" && res ? OUTCOME[res.outcome] : OUTCOME.unset;
+    // Final matches settle with the fixture's own outcome (both providers
+    // expose it once status === "final").
+    const outcome = f.status === "final" && f.outcome ? OUTCOME[f.outcome] : OUTCOME.unset;
     const score = f.score ?? { home: 0, away: 0 };
     const dataHash = [...Buffer.from(a.dataHash, "hex")];
 

@@ -1,7 +1,13 @@
 import { getTxOdds } from "@/lib/txodds";
-import { scanForEdges, summarize, type StrikerInput } from "@/lib/agent/striker";
+import { modelFair, scanForEdges, summarize, type StrikerInput } from "@/lib/agent/striker";
+
+// Cold live-mode scans hit TxLINE for every open fixture — allow up to 60s.
+export const maxDuration = 60;
 
 // GET /api/agent/signals -> ranked +EV opportunities the Striker agent would take.
+// `fair` is the agent's own view (consensus blended with its elo model) — on
+// the demargined live feed the market price IS the consensus, so edges exist
+// exactly where the agent's model disagrees with it.
 export async function GET() {
   const provider = getTxOdds();
   const fixtures = await provider.getFixtures();
@@ -13,7 +19,7 @@ export async function GET() {
       provider.getOdds(fixture.id),
       provider.getFairProbabilities(fixture.id),
     ]);
-    if (odds && fair) inputs.push({ fixture, oneXtwo: odds.oneXtwo, fair });
+    if (odds && fair) inputs.push({ fixture, oneXtwo: odds.oneXtwo, fair: modelFair(fixture, fair) });
   }
 
   const signals = scanForEdges(inputs);

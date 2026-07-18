@@ -2,9 +2,16 @@
 
 import { useRef, useState } from "react";
 import { useEmoteEngine } from "@/lib/emote/useEmoteEngine";
-import { INTEGRITY_DISCLAIMER, labelColor } from "@/lib/emote/integrity";
+import IntegrityDisclaimer from "@/components/IntegrityDisclaimer";
+import { labelColor } from "@/lib/emote/integrity";
+import { EMPTY, asInt, asScore100, formatScore100 } from "@/lib/format";
 
 const EMOTION_ORDER = ["neutral", "happy", "sad", "angry", "surprised", "fearful", "disgusted"] as const;
+
+function displayVital(n: number | null | undefined): string | number {
+  const v = asInt(n);
+  return v ?? EMPTY;
+}
 
 export default function EmoteAnalyzer({ subject = "subject" }: { subject?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -31,11 +38,7 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
 
   return (
     <div className="space-y-4">
-      {/* Disclaimer */}
-      <div className="flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 px-4 py-2.5 text-xs text-warn">
-        <span className="mt-0.5">⚠</span>
-        <span>{INTEGRITY_DISCLAIMER}</span>
-      </div>
+      <IntegrityDisclaimer />
 
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         {/* Video */}
@@ -81,10 +84,10 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
         {/* Integrity meter */}
         <div className="card flex flex-col p-5">
           <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-primary">Integrity signal</div>
-          <div className="text-xs text-faint">experimental suspicion meter · {subject}</div>
+          <div className="text-xs text-faint">experimental suspicion meter - {subject}</div>
 
           <div className="my-4 flex items-center justify-center">
-            <Gauge value={integ?.suspicion ?? 0} label={integ?.label ?? "—"} />
+            <Gauge value={integ?.suspicion} label={integ?.label} />
           </div>
 
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -94,17 +97,17 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs">
             <span className="text-muted">Signal confidence</span>
-            <span className="mono font-bold">{integ?.confidence ?? 0}%</span>
+            <span className="mono font-bold">{formatScore100(integ?.confidence)}</span>
           </div>
         </div>
       </div>
 
       {/* Vitals + emotion */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Vital k="Heart rate" v={signals.bpm ?? "—"} unit="BPM" />
-        <Vital k="HRV (RMSSD)" v={signals.rmssd ?? "—"} unit="ms" sub="est." />
-        <Vital k="Stress / arousal" v={signals.stress ?? "—"} unit="/100" />
-        <Vital k="Fatigue" v={signals.fatigueScore ?? 0} unit="%" sub={`${signals.blinks} blinks`} />
+        <Vital k="Heart rate" v={displayVital(signals.bpm)} unit="BPM" />
+        <Vital k="HRV (RMSSD)" v={displayVital(signals.rmssd)} unit="ms" sub="est." />
+        <Vital k="Stress / arousal" v={formatScore100(signals.stress)} unit="" />
+        <Vital k="Fatigue" v={signals.facePresent ? formatScore100(signals.fatigueScore) : EMPTY} unit="" sub={`${signals.blinks} blinks`} />
       </div>
 
       <div className="card p-5">
@@ -112,7 +115,7 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
           <div className="text-xs font-bold uppercase tracking-[0.15em] text-primary">Expression read</div>
           {signals.emotion && (
             <span className="chip capitalize">
-              {signals.emotion.dominant} · {(signals.emotion.confidence * 100).toFixed(0)}%
+              {signals.emotion.dominant} - {(signals.emotion.confidence * 100).toFixed(0)}%
             </span>
           )}
         </div>
@@ -135,19 +138,30 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
   );
 }
 
-function Gauge({ value, label }: { value: number; label: string }) {
-  const r = 54, c = 2 * Math.PI * r, off = c * (1 - value / 100);
-  const color = value >= 75 ? "var(--color-down)" : value >= 55 ? "#ff8a3d" : value >= 30 ? "var(--color-warn)" : "var(--color-up)";
+function Gauge({ value, label }: { value?: number; label?: string }) {
+  const hasValue = value != null;
+  const score = asScore100(value);
+  const r = 54, c = 2 * Math.PI * r, off = c * (1 - score / 100);
+  const color = score >= 75 ? "var(--color-down)" : score >= 55 ? "#ff8a3d" : score >= 30 ? "var(--color-warn)" : "var(--color-up)";
+  const displayLabel = label ?? EMPTY;
   return (
-    <div className="relative h-40 w-40">
+    <div
+      className="relative h-40 w-40"
+      role="meter"
+      aria-label="Integrity suspicion"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={hasValue ? score : undefined}
+      aria-valuetext={hasValue ? `${score}% ${displayLabel}` : "No signal"}
+    >
       <svg viewBox="0 0 128 128" className="h-full w-full -rotate-90">
         <circle cx="64" cy="64" r={r} fill="none" stroke="var(--color-surface-3)" strokeWidth="10" />
         <circle cx="64" cy="64" r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={off} style={{ transition: "stroke-dashoffset .3s, stroke .3s" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="mono text-4xl font-black">{value}</div>
-        <div className="text-xs font-bold uppercase tracking-wide" style={{ color: labelColor(label as never) }}>{label}</div>
+        <div className="mono text-4xl font-black">{hasValue ? score : EMPTY}</div>
+        <div className="text-xs font-bold uppercase tracking-wide" style={{ color: label ? labelColor(label as never) : "var(--color-faint)" }}>{displayLabel}</div>
       </div>
     </div>
   );
@@ -156,7 +170,7 @@ function Gauge({ value, label }: { value: number; label: string }) {
 function Mini({ k, v }: { k: string; v?: number }) {
   return (
     <div className="card-2 py-2">
-      <div className="mono text-lg font-bold">{v ?? 0}</div>
+      <div className="mono text-lg font-bold">{formatScore100(v)}</div>
       <div className="text-[10px] uppercase tracking-wide text-faint">{k}</div>
     </div>
   );

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useOnchain } from "@/lib/solana/useOnchain";
 import { isProgramConfigured } from "@/lib/solana/config";
 import { useBoard } from "@/lib/hooks";
 import { Flag } from "@/components/ui";
-import { kickoffLabel, relativeKickoff } from "@/lib/format";
+import { formatScoreline, kickoffLabel, relativeKickoff } from "@/lib/format";
 import type { Outcome1x2 } from "@/lib/txodds/types";
 
 type Picks = Record<number, Outcome1x2>;
@@ -21,18 +21,19 @@ const LEADERBOARD = [
 ];
 
 export default function MatchDay() {
-  const { items } = useBoard(15000);
+  const { items, loading, error } = useBoard(15000);
   const { connected, placePick } = useOnchain();
-  const [picks, setPicks] = useState<Picks>({});
-  const [streak, setStreak] = useState(0);
-  const [onchainCount, setOnchainCount] = useState(0);
-
-  useEffect(() => {
+  const [picks, setPicks] = useState<Picks>(() => {
+    if (typeof window === "undefined") return {};
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setPicks(JSON.parse(raw));
-    } catch {}
-  }, []);
+      return raw ? (JSON.parse(raw) as Picks) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [onchainCount, setOnchainCount] = useState(0);
+  const [onchainError, setOnchainError] = useState<string | null>(null);
 
   const upcoming = useMemo(
     () =>
@@ -45,18 +46,22 @@ export default function MatchDay() {
   const settled = useMemo(() => items.filter((i) => i.fixture.status === "final"), [items]);
 
   // Score settled picks.
-  const { correct, played, points } = useMemo(() => {
-    let c = 0, p = 0;
-    for (const i of settled) {
+  const { correct, played, points, streak } = useMemo(() => {
+    let c = 0, p = 0, currentStreak = 0;
+    const ordered = [...settled].sort((a, b) => +new Date(a.fixture.kickoff) - +new Date(b.fixture.kickoff));
+    for (const i of ordered) {
       const pick = picks[i.fixture.id];
       if (!pick) continue;
       p++;
-      if (pick === i.fixture.outcome) c++;
+      if (pick === i.fixture.outcome) {
+        c++;
+        currentStreak++;
+      } else {
+        currentStreak = 0;
+      }
     }
-    return { correct: c, played: p, points: c * 10 + (p - c) * 0 };
+    return { correct: c, played: p, points: c * 10 + (p - c) * 0, streak: currentStreak };
   }, [settled, picks]);
-
-  useEffect(() => setStreak(correct), [correct]);
 
   const setPick = (id: number, o: Outcome1x2) => {
     setPicks((prev) => {
@@ -66,7 +71,12 @@ export default function MatchDay() {
     });
     // Best-effort: record the pick on-chain when a wallet is connected.
     if (connected && isProgramConfigured()) {
-      placePick(id, o).then(() => setOnchainCount((c) => c + 1)).catch(() => {});
+      placePick(id, o)
+        .then(() => {
+          setOnchainCount((c) => c + 1);
+          setOnchainError(null);
+        })
+        .catch(() => setOnchainError("On-chain pick commit failed. Your local demo pick was saved."));
     }
   };
 
@@ -76,7 +86,7 @@ export default function MatchDay() {
     <div className="space-y-8">
       {/* Player header */}
       <div className="card flex flex-wrap items-center gap-5 p-5">
-        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-accent to-primary text-2xl">
+        <div className="grid h-14 w-14 place-items-center rounded-xl bg-surface-3 text-2xl">
           ⚽
         </div>
         <div>
@@ -84,13 +94,14 @@ export default function MatchDay() {
           <div className="text-sm text-muted">
             {connected
               ? `${onchainCount} pick${onchainCount === 1 ? "" : "s"} committed on-chain this session`
-              : "Connect a wallet to save picks on-chain & earn Moments"}
+              : "Connect a wallet to try best-effort on-chain pick commits"}
           </div>
+          {onchainError && <div className="mt-1 text-xs text-warn">{onchainError}</div>}
         </div>
         <div className="ml-auto flex gap-3">
           <MiniStat k="Points" v={points} />
           <MiniStat k="Correct" v={`${correct}/${played}`} />
-          <MiniStat k="Streak" v={`${streak}🔥`} />
+          <MiniStat k="Streak" v={streak} />
         </div>
       </div>
 
@@ -99,8 +110,14 @@ export default function MatchDay() {
         <section>
           <h3 className="mb-3 text-lg font-black">Make your picks</h3>
           <div className="space-y-2">
-            {upcoming.length === 0 && (
+            {loading && upcoming.length === 0 && (
               <div className="card py-12 text-center text-muted">Loading fixtures…</div>
+            )}
+            {!loading && error && upcoming.length === 0 && (
+              <div className="card py-12 text-center text-muted">Unable to load fixtures.</div>
+            )}
+            {!loading && !error && upcoming.length === 0 && (
+              <div className="card py-12 text-center text-muted">No open picks right now.</div>
             )}
             {upcoming.map((i) => {
               const f = i.fixture;
@@ -141,7 +158,8 @@ export default function MatchDay() {
         {/* Leaderboard + Moments */}
         <aside className="space-y-6">
           <section>
-            <h3 className="mb-3 text-lg font-black">Leaderboard</h3>
+            <h3 className="mb-1 text-lg font-black">Demo leaderboard</h3>
+            <p className="mb-3 text-xs text-muted">Seeded demo rivals plus your local pick score.</p>
             <div className="card divide-y divide-border">
               {[...LEADERBOARD, { name: "you", pts: myRankPts, badges: correct }]
                 .sort((a, b) => b.pts - a.pts)
@@ -161,15 +179,15 @@ export default function MatchDay() {
 
           <section>
             <h3 className="mb-1 text-lg font-black">Your Moments</h3>
-            <p className="mb-3 text-xs text-muted">Collectible cards minted from real match events you called right.</p>
+            <p className="mb-3 text-xs text-muted">Demo cards unlocked from match events you called right.</p>
             <div className="grid grid-cols-2 gap-3">
               {settled.filter((i) => picks[i.fixture.id] && picks[i.fixture.id] === i.fixture.outcome).slice(0, 4).map((i) => (
                 <Moment key={i.fixture.id} home={i.fixture.home.flag} away={i.fixture.away.flag}
-                  label={`${i.fixture.home.code} ${i.fixture.score?.home}-${i.fixture.score?.away} ${i.fixture.away.code}`} />
+                  label={`${i.fixture.home.code} ${formatScoreline(i.fixture.score?.home, i.fixture.score?.away)} ${i.fixture.away.code}`} />
               ))}
               {correct === 0 && (
                 <div className="col-span-2 card border-dashed py-8 text-center text-sm text-muted">
-                  Call a result right to mint your first Moment.
+                  Call a result right to unlock your first demo Moment.
                 </div>
               )}
             </div>
@@ -191,13 +209,10 @@ function MiniStat({ k, v }: { k: string; v: React.ReactNode }) {
 
 function Moment({ home, away, label }: { home: string; away: string; label: string }) {
   return (
-    <div className="card relative overflow-hidden p-3 text-center">
-      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
-      <div className="relative">
-        <div className="text-2xl">{home} {away}</div>
-        <div className="mono mt-1 text-xs font-bold">{label}</div>
-        <div className="mt-1 text-[10px] uppercase tracking-wide text-primary">cNFT Moment</div>
-      </div>
+    <div className="card p-3 text-center">
+      <div className="text-2xl">{home} {away}</div>
+      <div className="mono mt-1 text-xs font-bold">{label}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-wide text-primary">Demo Moment</div>
     </div>
   );
 }
