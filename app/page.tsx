@@ -31,7 +31,7 @@ const FLOW = [
 
 export default function Home() {
   return (
-    <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
+    <main className="px-4 pb-20 sm:px-6">
       {/* Hero */}
       <section className="pt-12 sm:pt-16">
         <div className="mb-6">
