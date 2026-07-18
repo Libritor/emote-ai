@@ -181,8 +181,8 @@ function simulateMatch(
 ): { score: Score; outcome: Outcome1x2; lambdaHome: number; lambdaAway: number } {
   const { lambdaHome, lambdaAway } = matchupLambdas(home, away, neutral);
   const rnd = mulberry32(0x9e37 + id * 2654435761);
-  let h = samplePoisson(lambdaHome, rnd);
-  let a = samplePoisson(lambdaAway, rnd);
+  const h = samplePoisson(lambdaHome, rnd);
+  const a = samplePoisson(lambdaAway, rnd);
   let outcome: Outcome1x2 = h > a ? "1" : h < a ? "2" : "X";
   if (knockout && h === a) {
     // Decide level knockout games by an elo-weighted "shootout".
@@ -236,7 +236,7 @@ function rankStandings(a: Standing, b: Standing): number {
 
 // Standard single-elimination seed order for a 32-team bracket.
 function seedOrder(n: number): number[] {
-  let rounds = Math.log2(n);
+  const rounds = Math.log2(n);
   let pots = [1, 2];
   for (let r = 1; r < rounds; r++) {
     const len = pots.length * 2 + 1;

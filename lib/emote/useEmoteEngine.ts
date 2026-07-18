@@ -7,7 +7,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createFaceLandmarker,
   landmarkBox,
@@ -23,18 +23,24 @@ import { FatigueDetector } from "./fatigue.js";
 import { classifyEmotion } from "./emotion.js";
 import { StressEstimator } from "./stress.js";
 import { computeIntegrity, type EmotionProbs, type IntegrityReading } from "./integrity";
+import { asInt, asScore100 } from "@/lib/format";
 
 export interface EmoteSignals {
   facePresent: boolean;
+  /** Heart rate in BPM, nearest integer when available. */
   bpm: number | null;
+  /** RMSSD in ms, nearest integer when available. */
   rmssd: number | null;
   sdnn: number | null;
+  /** Signal quality 0–100. */
   quality: number;
   progress: number;
   ear: number;
   blinks: number;
+  /** Fatigue 0–100. */
   fatigueScore: number;
   emotion: { dominant: string; confidence: number; probabilities: EmotionProbs } | null;
+  /** Stress / arousal 0–100. */
   stress: number | null;
   integrity: IntegrityReading | null;
   waveform: number[];
@@ -67,6 +73,7 @@ export function useEmoteEngine() {
     lastSampleT: 0,
     stream: null as MediaStream | null,
   });
+  const loopRef = useRef<FrameRequestCallback | null>(null);
 
   const meanColorInRect = useCallback((rect: Rect) => {
     const { sampler, sctx } = s.current;
@@ -92,7 +99,7 @@ export function useEmoteEngine() {
     const st = s.current;
     const video = st.video;
     if (!video) return;
-    st.raf = requestAnimationFrame(loop);
+    if (loopRef.current) st.raf = requestAnimationFrame(loopRef.current);
     if (video.readyState < 2 || !video.videoWidth) return;
 
     const targetW = 256;
@@ -148,6 +155,7 @@ export function useEmoteEngine() {
       const progress = st.rppg.progress() * 100;
       const stale = st.lastSampleT && t - st.lastSampleT > 2.0;
       const res = !stale ? st.rppg.compute() : null;
+      if (!facePresent) st.fatigue.clearTransient();
       const fat = (facePresent
         ? st.fatigue.update(ear)
         : { ear: 0, score: 0, blinks: st.fatigue.blinks ?? 0, status: "OK" }) as {
@@ -158,11 +166,14 @@ export function useEmoteEngine() {
       let quality = 0, bpm: number | null = null, rmssd: number | null = null, sdnn: number | null = null, wave: number[] = [];
       let status = progress < 100 ? "Collecting" : "Analyzing";
       if (res) {
-        quality = res.quality; bpm = res.bpm; wave = res.waveform ? Array.from(res.waveform as ArrayLike<number>) : [];
-        rmssd = res.hrv?.rmssd ?? null; sdnn = res.hrv?.sdnn ?? null;
-        status = res.quality > 55 ? "Live" : res.quality > 25 ? "Analyzing" : "Low signal";
-        const st2 = st.stress.update(t, res.bpm, rmssd, res.quality);
-        stressIdx = st2.calibrating ? null : st2.index;
+        quality = asScore100(res.quality);
+        bpm = asInt(res.bpm);
+        wave = res.waveform ? Array.from(res.waveform as ArrayLike<number>) : [];
+        rmssd = asInt(res.hrv?.rmssd ?? null);
+        sdnn = asInt(res.hrv?.sdnn ?? null);
+        status = quality > 55 ? "Live" : quality > 25 ? "Analyzing" : "Low signal";
+        const st2 = st.stress.update(t, res.bpm, rmssd, quality);
+        stressIdx = st2.calibrating ? null : asScore100(st2.index);
       } else if (stale) {
         status = "No signal";
       }
@@ -174,12 +185,27 @@ export function useEmoteEngine() {
       });
 
       setSignals({
-        facePresent, bpm, rmssd, sdnn, quality, progress,
-        ear: fat.ear, blinks: fat.blinks, fatigueScore: fat.score,
-        emotion, stress: stressIdx, integrity, waveform: wave, status,
+        facePresent,
+        bpm,
+        rmssd,
+        sdnn,
+        quality,
+        progress: asScore100(progress),
+        ear: fat.ear,
+        blinks: fat.blinks,
+        fatigueScore: asScore100(fat.score),
+        emotion,
+        stress: stressIdx,
+        integrity,
+        waveform: wave,
+        status,
       });
     }
   }, [meanColorInRect]);
+
+  useEffect(() => {
+    loopRef.current = loop;
+  }, [loop]);
 
   const begin = useCallback(async (video: HTMLVideoElement) => {
     const st = s.current;
@@ -193,8 +219,8 @@ export function useEmoteEngine() {
       catch (e) { setError("Face model failed to load (needs internet). " + (e as Error).message); }
     }
     setRunning(true);
-    st.raf = requestAnimationFrame(loop);
-  }, [loop]);
+    if (loopRef.current) st.raf = requestAnimationFrame(loopRef.current);
+  }, []);
 
   const startWebcam = useCallback(async (video: HTMLVideoElement) => {
     setError(null);

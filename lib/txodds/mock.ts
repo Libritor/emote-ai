@@ -2,7 +2,7 @@
 //
 // Wraps the deterministic tournament (tournament.ts) with:
 //   1. a rolling match clock so, relative to "now", games are final / live /
-//      upcoming — this is what makes on-chain settlement demoable;
+//      upcoming - this is what makes on-chain settlement demoable;
 //   2. a 1X2 + O/U pricing model with a small, seeded per-fixture mispricing so
 //      the Striker trading agent has genuine +EV edges to discover.
 //
@@ -30,6 +30,7 @@ const MINUTE = 60_000;
 const SPACING_MS = 45 * MINUTE; // gap between consecutive kickoffs on the timeline
 const MATCH_MS = 105 * MINUTE; // full match incl. half-time before "final"
 const PIVOT = 46; // fixtures before this index have already kicked off at t=now
+const PIVOT_KICKOFF_MS = Date.UTC(2026, 6, 18, 12, 0, 0);
 const OVERROUND = 1.06; // 6% bookmaker margin baked into market prices
 
 let cached: Tournament | null = null;
@@ -38,8 +39,8 @@ function tournament(): Tournament {
   return cached;
 }
 
-function kickoffMs(sim: SimFixture, now: number): number {
-  return now + (sim.seq - PIVOT) * SPACING_MS;
+function kickoffMs(sim: SimFixture): number {
+  return PIVOT_KICKOFF_MS + (sim.seq - PIVOT) * SPACING_MS;
 }
 
 function seededNoise(id: number, salt: number): number {
@@ -58,7 +59,7 @@ function partialScore(trueScore: Score, minute: number): Score {
 
 /** Map an internal SimFixture to the public Fixture, applying the match clock. */
 export function toFixture(sim: SimFixture, now: number): Fixture {
-  const kickoff = kickoffMs(sim, now);
+  const kickoff = kickoffMs(sim);
   const base: Fixture = {
     id: sim.id,
     stage: sim.stage,
@@ -94,7 +95,7 @@ function fairProbs(sim: SimFixture): { home: number; draw: number; away: number;
 function marketOdds(sim: SimFixture, now: number): FixtureOdds {
   const fair = fairProbs(sim);
 
-  // Seeded mispricing (±, up to ~9% relative) — the edge the agent hunts.
+  // Seeded mispricing (±, up to ~9% relative) - the edge the agent hunts.
   const bias = seededNoise(sim.id, 3) * 0.09;
   let mh = Math.max(0.02, fair.home * (1 + bias));
   let ma = Math.max(0.02, fair.away * (1 - bias));
@@ -116,7 +117,7 @@ function marketOdds(sim: SimFixture, now: number): FixtureOdds {
 
   // Over/Under 2.5 with its own small mispricing.
   const overBias = seededNoise(sim.id, 7) * 0.06;
-  let pOver = Math.min(0.95, Math.max(0.05, fair.over * (1 + overBias)));
+  const pOver = Math.min(0.95, Math.max(0.05, fair.over * (1 + overBias)));
   const pUnder = 1 - pOver;
   const ou25: OddsOu25 = {
     fixtureId: sim.id,
@@ -160,7 +161,7 @@ export class MockTxOddsProvider implements TxOddsProvider {
   }
 }
 
-/** The true, settled outcome — used only by the oracle relayer, never the UI. */
+/** The true, settled outcome - used only by the oracle relayer, never the UI. */
 export function trueResult(id: number): { outcome: Outcome1x2; score: Score } | null {
   const sim = tournament().fixtures.find((s) => s.id === id);
   return sim ? { outcome: sim.trueOutcome, score: sim.trueScore } : null;

@@ -1,16 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useBoard, type BoardItem } from "@/lib/hooks";
+import MarketDetail from "@/components/MarketDetail";
 import { Flag, StatusChip, StageChip } from "@/components/ui";
-import { kickoffLabel, relativeKickoff } from "@/lib/format";
+import { formatOdds, formatScore100, kickoffLabel, relativeKickoff } from "@/lib/format";
 import { matchSuspicion, labelColor } from "@/lib/emote/integrity";
 
 type Tab = "live" | "upcoming" | "results";
 
 export default function MatchBoard() {
-  const { items, mode, loading } = useBoard();
+  const { items, mode, loading, error } = useBoard();
   const [tab, setTab] = useState<Tab>("upcoming");
 
   const groups = useMemo(() => {
@@ -35,10 +35,12 @@ export default function MatchBoard() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">
+        <div className="flex gap-1 rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Match board filters">
           {TABS.map((t) => (
             <button
               key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={`rounded-lg px-3.5 py-1.5 text-sm font-bold transition ${
                 tab === t.id ? "bg-surface-3 text-ink" : "text-muted hover:text-ink"
@@ -51,12 +53,20 @@ export default function MatchBoard() {
           ))}
         </div>
         <span className="ml-auto chip">
-          feed: {mode ?? "…"}
+          {mode === "live" ? "Live feed" : mode === "mock" ? "Simulated feed" : "Feed"}
         </span>
       </div>
 
+      {error && (
+        <div className="mb-3 rounded-xl border border-warn/40 bg-warn/10 px-4 py-2.5 text-xs text-warn">
+          Feed unavailable. Showing the last loaded board.
+        </div>
+      )}
+
       {loading && items.length === 0 ? (
         <div className="card grid place-items-center py-20 text-muted">Loading the feed…</div>
+      ) : error && items.length === 0 ? (
+        <div className="card grid place-items-center py-20 text-muted">Unable to load matches.</div>
       ) : active.length === 0 ? (
         <div className="card grid place-items-center py-20 text-muted">
           No {tab} matches right now.
@@ -75,34 +85,47 @@ export default function MatchBoard() {
 function MatchRow({ item }: { item: BoardItem }) {
   const { fixture: f, oneXtwo } = item;
   const isFinal = f.status === "final";
-  return (
-    <Link
-      href={`/markets/${f.id}`}
-      className="card grid grid-cols-[1fr_auto] items-center gap-4 p-3.5 transition hover:border-border-bright sm:grid-cols-[1.4fr_auto]"
-    >
-      <div className="min-w-0">
-        <div className="mb-2 flex items-center gap-2">
-          <StageChip fixture={f} />
-          <StatusChip fixture={f} />
-          <IntegrityChip id={f.id} />
-          <span className="hidden text-xs text-faint sm:inline">
-            {f.status === "scheduled" ? `${kickoffLabel(f.kickoff)} · ${relativeKickoff(f.kickoff)}` : f.venue}
-          </span>
-        </div>
-        <div className="space-y-1">
-          <TeamLine code={f.home.code} flag={f.home.flag} name={f.home.name} score={f.score?.home} dim={isFinal && f.outcome !== "1"} />
-          <TeamLine code={f.away.code} flag={f.away.flag} name={f.away.name} score={f.score?.away} dim={isFinal && f.outcome !== "2"} />
-        </div>
-      </div>
+  const [open, setOpen] = useState(false);
 
-      {oneXtwo && (
-        <div className="grid w-[190px] grid-cols-3 gap-1.5 sm:w-[220px]">
-          <OddsCell label="1" value={oneXtwo.home} win={isFinal && f.outcome === "1"} />
-          <OddsCell label="X" value={oneXtwo.draw} win={isFinal && f.outcome === "X"} />
-          <OddsCell label="2" value={oneXtwo.away} win={isFinal && f.outcome === "2"} />
+  return (
+    <details
+      className="card group overflow-hidden transition hover:border-border-bright"
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-4 p-3.5 marker:hidden [&::-webkit-details-marker]:hidden sm:grid-cols-[1.4fr_auto]">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center gap-2">
+            <StageChip fixture={f} />
+            <StatusChip fixture={f} />
+            <IntegrityChip id={f.id} />
+            <span className="hidden text-xs text-faint sm:inline">
+              {f.status === "scheduled" ? `${kickoffLabel(f.kickoff)} · ${relativeKickoff(f.kickoff)}` : f.venue}
+            </span>
+          </div>
+          <div className="space-y-1">
+            <TeamLine code={f.home.code} flag={f.home.flag} name={f.home.name} score={f.score?.home} dim={isFinal && f.outcome !== "1"} />
+            <TeamLine code={f.away.code} flag={f.away.flag} name={f.away.name} score={f.score?.away} dim={isFinal && f.outcome !== "2"} />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {oneXtwo && (
+            <div className="grid w-[190px] grid-cols-3 gap-1.5 sm:w-[220px]">
+              <OddsCell label="1" value={oneXtwo.home} win={isFinal && f.outcome === "1"} />
+              <OddsCell label="X" value={oneXtwo.draw} win={isFinal && f.outcome === "X"} />
+              <OddsCell label="2" value={oneXtwo.away} win={isFinal && f.outcome === "2"} />
+            </div>
+          )}
+          <span className="text-xs font-bold text-primary transition group-open:rotate-90">-&gt;</span>
+        </div>
+      </summary>
+
+      {open && (
+        <div className="border-t border-border p-4">
+          <MarketDetail id={f.id} embedded />
         </div>
       )}
-    </Link>
+    </details>
   );
 }
 
@@ -111,11 +134,11 @@ function IntegrityChip({ id }: { id: number }) {
   return (
     <span
       className="chip"
-      title={`Emote AI integrity signal: ${label} (${score}/100) — experimental`}
+      title={`Emote AI integrity signal: ${label} (${score}/100) - experimental`}
       style={{ color: labelColor(label), borderColor: "currentColor" }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: labelColor(label) }} />
-      {score}
+      Integrity {formatScore100(score)} · {label}
     </span>
   );
 }
@@ -148,7 +171,7 @@ function OddsCell({ label, value, win }: { label: string; value: number; win?: b
   return (
     <div className="odds" data-active={win ? "true" : "false"}>
       <span className="text-[10px] font-bold uppercase text-faint">{label}</span>
-      <span className="mono text-sm font-bold">{value.toFixed(2)}</span>
+      <span className="mono text-sm font-bold">{formatOdds(value)}</span>
     </div>
   );
 }

@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /*
-  Emote AI design system — a biometric/integrity "control room" look.
-  Amber signal-brand (#F5A623) with an integrity-alert magenta (#FF3B6B) over a
-  deep near-black surface stack. Green = clean, red = flagged.
+  Emote AI design system — flat biometric/integrity control room.
+  Amber signal (#F5A623), magenta alert (#FF3B6B), near-black surfaces.
+  Green = clean, red = flagged. No ambient gradients.
 */
 @theme {
   --color-base: #08090d;
@@ -29,7 +29,7 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
 
-  --radius-card: 16px;
+  --radius-card: 12px;
 }
 
 @layer base {
@@ -40,10 +40,7 @@
     background-color: var(--color-base);
   }
   body {
-    background:
-      radial-gradient(1100px 600px at 78% -8%, rgba(255, 59, 107, 0.12), transparent 60%),
-      radial-gradient(1000px 620px at 8% -12%, rgba(245, 166, 35, 0.12), transparent 58%),
-      var(--color-base);
+    background: var(--color-base);
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -71,9 +68,7 @@
 
 @layer components {
   .card {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
-      var(--color-surface);
+    background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-card);
   }
@@ -146,11 +141,11 @@
     border: 1px solid transparent;
   }
   .btn-primary {
-    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dim));
+    background: var(--color-primary);
     color: #04130c;
   }
   .btn-primary:hover {
-    filter: brightness(1.07);
+    background: var(--color-primary-dim);
   }
   .btn-ghost {
     background: var(--color-surface-2);
@@ -164,9 +159,6 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .glow-primary {
-    box-shadow: 0 0 40px -12px rgba(245, 166, 35, 0.5);
-  }
   .mono {
     font-family: var(--font-mono);
   }
@@ -175,15 +167,32 @@
     height: 7px;
     border-radius: 9999px;
     background: var(--color-primary);
-    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.7);
     animation: pp-pulse 1.6s infinite;
+  }
+  .hero-gradient {
+    background: linear-gradient(
+      90deg,
+      var(--color-primary),
+      var(--color-accent),
+      var(--color-primary)
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: hero-gradient-shift 6s linear infinite;
   }
 }
 
 @keyframes pp-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.6); }
-  70% { box-shadow: 0 0 0 7px rgba(245, 166, 35, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes hero-gradient-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 
 /* Solana wallet-adapter button, restyled to match. */
@@ -203,7 +212,10 @@
   border-color: var(--color-primary-dim) !important;
 }
 .wallet-adapter-button-trigger {
-  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-dim)) !important;
+  background: var(--color-accent) !important;
   border-color: transparent !important;
   color: #fff !important;
+}
+.wallet-adapter-button-trigger:not([disabled]):hover {
+  background: var(--color-accent-dim) !important;
 }

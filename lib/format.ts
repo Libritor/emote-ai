@@ -1,5 +1,7 @@
 import type { Fixture, Outcome1x2 } from "@/lib/txodds/types";
 
+export const EMPTY = "-";
+
 export function outcomeLabel(o: Outcome1x2, f: Fixture): string {
   return o === "1" ? f.home.name : o === "2" ? f.away.name : "Draw";
 }
@@ -49,6 +51,49 @@ export function shorten(s: string, n = 4): string {
 
 export function impliedPct(decimalOdds: number): number {
   return Math.round((1 / decimalOdds) * 100);
+}
+
+export function fairPct(probability: number): number {
+  return Math.round(probability * 100);
+}
+
+/** Round a nullable biometric to the nearest integer. */
+export function asInt(n: number | null | undefined): number | null {
+  if (n == null || Number.isNaN(n)) return null;
+  return Math.round(n);
+}
+
+/** Clamp a score into the inclusive 0–100 integer range. */
+export function asScore100(n: number | null | undefined): number {
+  if (n == null || Number.isNaN(n)) return 0;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
+
+export function formatOdds(n: number): string {
+  return n.toFixed(2);
+}
+
+export function formatPct(n: number, digits = 0): string {
+  return `${n.toFixed(digits)}%`;
+}
+
+export function formatProbability(probability: number, digits = 0): string {
+  return formatPct(probability * 100, digits);
+}
+
+export function formatScore100(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return EMPTY;
+  return formatPct(asScore100(n));
+}
+
+export function formatSignedPct(n: number, digits = 1): string {
+  const pct = n * 100;
+  return `${pct >= 0 ? "+" : ""}${formatPct(pct, digits)}`;
+}
+
+export function formatScoreline(home: number | null | undefined, away: number | null | undefined): string {
+  if (home == null || away == null) return `${EMPTY}-${EMPTY}`;
+  return `${home}-${away}`;
 }
 
 /** Expected value per 1 unit staked on a decimal-odds bet given a fair prob. */

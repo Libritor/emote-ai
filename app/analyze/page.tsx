@@ -2,7 +2,7 @@ import EmoteAnalyzer from "@/components/EmoteAnalyzer";
 import { SectionHeading } from "@/components/ui";
 
 export const metadata = {
-  title: "Emote AI — Analyze",
+  title: "Emote AI - Analyze",
 };
 
 export default function AnalyzePage() {
@@ -11,9 +11,9 @@ export default function AnalyzePage() {
       <SectionHeading
         eyebrow="Detection core"
         title="Analyze"
-        desc="Point Emote AI at a referee or player — live via webcam or an uploaded match clip. It reads heart rate (rPPG), stress/arousal, fatigue and expression, and fuses them into an experimental 'integrity' suspicion signal that can be published on-chain."
+        desc="Point Emote AI at a referee or player - live via webcam or an uploaded match clip. It reads heart rate (rPPG), stress/arousal, fatigue and expression, then fuses them into an experimental integrity signal."
       />
-      <EmoteAnalyzer subject="ref or player" />
+      <EmoteAnalyzer subject="referee or player" />
     </main>
   );
 }
