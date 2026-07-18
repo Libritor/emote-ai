@@ -81,7 +81,7 @@ export default function Terminal() {
             <BotIcon />
           </span>
           <div>
-            <div className="font-black">Striker</div>
+            <div className="font-black">Sentinel</div>
             <div className="text-xs text-muted">Autonomous edge-taking agent · feed: {mode}</div>
           </div>
         </div>
@@ -192,7 +192,7 @@ export default function Terminal() {
       </div>
 
       <p className="text-xs text-faint">
-        Strategy is fully deterministic and inspectable — Striker only ever books positive
+        Strategy is fully deterministic and inspectable — Sentinel only ever books positive
         expected-value edges (market price cheaper than model-fair) at a capped half-Kelly stake.
         On devnet it executes these via the PitchProof program; here it books them to a paper blotter.
       </p>

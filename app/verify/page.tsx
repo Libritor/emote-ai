@@ -23,7 +23,7 @@ export default async function VerifyPage() {
       <SectionHeading
         eyebrow="Oracle Tooling"
         title="Verify"
-        desc="Every settled World Cup result is attested on-chain: the TxODDS outcome plus a sha256 data hash written into the PitchProof oracle program. Anyone can recompute the hash and confirm what the markets settled against — no trust required."
+        desc="Every reading is attested on-chain: the match result and the Emote AI integrity signal, plus a sha256 evidence hash written into the oracle program. Anyone can recompute the hash and confirm exactly what the markets settled against — no trust required."
       />
 
       {/* Oracle status */}
