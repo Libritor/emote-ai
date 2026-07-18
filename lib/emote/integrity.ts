@@ -83,6 +83,23 @@ export function computeIntegrity(input: IntegrityInput): IntegrityReading {
   };
 }
 
+/**
+ * A deterministic per-match "integrity" reading for the demo — stands in for the
+ * aggregate on-chain integrity attestation the oracle would write from live
+ * Ref-Cam analysis. Seeded by match id so it's stable. Experimental heuristic.
+ */
+export function matchSuspicion(matchId: number): { score: number; label: IntegrityLabel } {
+  const x = Math.sin(matchId * 12.9898 + 78.233) * 43758.5453;
+  const frac = x - Math.floor(x);
+  // Most matches are clean; a few skew suspicious.
+  const score = Math.round(Math.pow(frac, 1.7) * 100);
+  let label: IntegrityLabel = "Composed";
+  if (score >= 75) label = "Flagged";
+  else if (score >= 55) label = "Elevated";
+  else if (score >= 30) label = "Nervous";
+  return { score, label };
+}
+
 export function labelColor(label: IntegrityLabel): string {
   switch (label) {
     case "Composed": return "var(--color-up)";
