@@ -1,10 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEmoteEngine } from "@/lib/emote/useEmoteEngine";
 import IntegrityDisclaimer from "@/components/IntegrityDisclaimer";
+import IntegrityTimeline from "@/components/IntegrityTimeline";
 import { labelColor } from "@/lib/emote/integrity";
-import { EMPTY, asInt, asScore100, formatScore100 } from "@/lib/format";
+import { hashReading, type CapturedReading } from "@/lib/emote/reading";
+import { EMPTY, asInt, asScore100, formatScore100, shorten } from "@/lib/format";
+
+const HISTORY_LEN = 150; // ~50s at ~3 Hz
+
+interface Attestation extends CapturedReading {
+  label: string;
+  hash: string;
+}
 
 const EMOTION_ORDER = ["neutral", "happy", "sad", "angry", "surprised", "fearful", "disgusted"] as const;
 
@@ -32,9 +41,37 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
     setSource("clip");
     startClip(v);
   };
-  const onStop = () => { setSource("none"); stop(); };
+  const [history, setHistory] = useState<number[]>([]);
+  const [attestations, setAttestations] = useState<Attestation[]>([]);
 
   const integ = signals.integrity;
+
+  // Record the suspicion score into a rolling timeline while a face is tracked.
+  useEffect(() => {
+    if (!running || !signals.facePresent || !integ) return;
+    setHistory((h) => [...h, integ.suspicion].slice(-HISTORY_LEN));
+  }, [running, signals.facePresent, integ]);
+
+  useEffect(() => {
+    if (!running) setHistory([]);
+  }, [running]);
+
+  const capture = useCallback(async () => {
+    if (!integ) return;
+    const reading: CapturedReading = {
+      subject,
+      suspicion: integ.suspicion,
+      guilt: integ.guilt,
+      tells: integ.tells,
+      masking: integ.masking,
+      hr: asInt(signals.bpm) ?? null,
+      ts: Date.now(),
+    };
+    const hash = await hashReading(reading);
+    setAttestations((a) => [{ ...reading, label: integ.label, hash }, ...a].slice(0, 6));
+  }, [integ, subject, signals.bpm]);
+
+  const onStop = () => { setSource("none"); setHistory([]); stop(); };
 
   return (
     <div className="space-y-4">
@@ -99,8 +136,45 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
             <span className="text-muted">Signal confidence</span>
             <span className="mono font-bold">{formatScore100(integ?.confidence)}</span>
           </div>
+          <button
+            onClick={capture}
+            disabled={!integ}
+            className="btn btn-ghost mt-3 w-full text-sm disabled:opacity-40"
+            title="Snapshot this reading into a verifiable, on-chain-ready attestation"
+          >
+            Capture reading → attest
+          </button>
         </div>
       </div>
+
+      {/* Live suspicion timeline */}
+      <IntegrityTimeline data={history} />
+
+      {/* Captured attestations */}
+      {attestations.length > 0 && (
+        <div className="card p-5">
+          <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em] text-primary">
+            Captured attestations
+          </div>
+          <div className="mb-3 text-xs text-faint">
+            Each is a sha256 of the reading&rsquo;s canonical record — the exact bytes the oracle would
+            publish on-chain, recomputable by anyone.
+          </div>
+          <div className="space-y-1.5">
+            {attestations.map((a) => (
+              <div key={a.ts} className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-xs">
+                <span className="chip" style={{ color: labelColor(a.label as never), borderColor: "currentColor" }}>
+                  {a.suspicion}
+                </span>
+                <span className="text-muted">{new Date(a.ts).toLocaleTimeString()}</span>
+                <span className="mono ml-auto truncate text-faint" title={a.hash}>
+                  {shorten(a.hash, 8)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Vitals + emotion */}
       <div className="grid gap-4 md:grid-cols-4">
