@@ -7,6 +7,25 @@ the server (`lib/txline/client.ts`); the browser never sees credentials.
 Hosts: mainnet `https://txline.txodds.com` - devnet `https://txline-dev.txodds.com`
 (same paths on both; pick ONE network for the whole credential chain).
 
+## How easy it is to integrate and reuse
+
+Auth is a one-time wallet flow; after that, every surface shares the same thin
+client and provider - no per-feature wiring.
+
+1. **One-time credentials** - Run `/setup/txline` (or `scripts/txline/activate.mjs`),
+   drop `TXLINE_JWT` + `TXLINE_API_TOKEN` into `.env.local`, set `TXODDS_MODE=live`.
+2. **Thin HTTP client** - `lib/txline/client.ts` is four typed helpers
+   (`fetchFixturesSnapshot`, `fetchOddsSnapshot`, `fetchScoresSnapshot`,
+   `fetchScoresUpdates`). Headers and origin come from env automatically.
+3. **One app contract** - `LiveTxOddsProvider` maps TxLINE payloads onto
+   `TxOddsProvider`. Callers use `getTxOdds()` and never touch raw TxLINE shapes.
+4. **Reuse everywhere** - Markets board, Sentinel agent, Verify page, and the
+   on-chain relayer all import the same `getTxOdds()`. A new route is typically
+   `const provider = getTxOdds()` plus the method you need.
+5. **Mock ↔ live flip** - Unset or change `TXODDS_MODE` to leave live mode and
+   the identical interface serves the mock provider - useful for local UI work
+   without TxLINE reachability.
+
 ## Authentication (one-time, wallet-signed)
 
 | # | Endpoint | Purpose | Where in code |
