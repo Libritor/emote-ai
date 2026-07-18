@@ -19,7 +19,7 @@ export default async function VerifyPage() {
   const configured = isProgramConfigured();
 
   return (
-    <main className="mx-auto max-w-[1000px] px-4 py-8 sm:px-6">
+    <main className="px-4 py-8 sm:px-6">
       <SectionHeading
         eyebrow="Oracle Tooling"
         title="Verify"

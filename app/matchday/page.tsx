@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function IntegrityRoomPage() {
   return (
-    <main className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+    <main className="px-4 py-8 sm:px-6">
       <SectionHeading
         eyebrow="Consumer & Fan Experiences"
         title="The Integrity Room"

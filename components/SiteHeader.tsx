@@ -23,7 +23,7 @@ export default function SiteHeader() {
   const pathname = usePathname();
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-base">
-      <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 items-center gap-6 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <EmoteLogo />
           <span className="text-lg font-black tracking-tight">

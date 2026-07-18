@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function MarketsPage() {
   return (
-    <main className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+    <main className="px-4 py-8 sm:px-6">
       <SectionHeading
         eyebrow="Prediction Markets & Settlement"
         title="Integrity Markets"

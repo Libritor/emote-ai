@@ -17,9 +17,11 @@ interface Attestation extends CapturedReading {
 
 const EMOTION_ORDER = ["neutral", "happy", "sad", "angry", "surprised", "fearful", "disgusted"] as const;
 
+const roundOrNull = (n: number | null | undefined): number | null =>
+  n == null || Number.isNaN(n) ? null : Math.round(n);
+
 function displayVital(n: number | null | undefined): string | number {
-  const v = asInt(n);
-  return v ?? EMPTY;
+  return roundOrNull(n) ?? EMPTY;
 }
 
 export default function EmoteAnalyzer({ subject = "subject" }: { subject?: string }) {
@@ -28,7 +30,7 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
   const [source, setSource] = useState<"none" | "webcam" | "clip">("none");
 
   const onWebcam = () => {
-    if (videoRef.current) { setSource("webcam"); startWebcam(videoRef.current); }
+    if (videoRef.current) { resetDisplay(); setSource("webcam"); startWebcam(videoRef.current); }
   };
   const onClip = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,13 +40,42 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
     v.src = URL.createObjectURL(file);
     v.loop = true;
     v.muted = true;
+    resetDisplay();
     setSource("clip");
     startClip(v);
   };
   const [history, setHistory] = useState<number[]>([]);
   const [attestations, setAttestations] = useState<Attestation[]>([]);
+  const [d, setD] = useState({
+    bpm: null as number | null, rmssd: null as number | null, stress: null as number | null,
+    fatigue: null as number | null, blinks: 0, suspicion: null as number | null,
+    guilt: null as number | null, tells: null as number | null, masking: null as number | null,
+    label: null as string | null, confidence: null as number | null,
+    emotion: null as typeof signals.emotion,
+  });
+  const resetDisplay = () =>
+    setD({ bpm: null, rmssd: null, stress: null, fatigue: null, blinks: 0, suspicion: null, guilt: null, tells: null, masking: null, label: null, confidence: null, emotion: null });
 
   const integ = signals.integrity;
+
+  // Persist the last collected value for every metric (rounded) so the panels
+  // keep showing a number instead of flickering blank when a signal drops.
+  useEffect(() => {
+    setD((p) => ({
+      bpm: roundOrNull(signals.bpm) ?? p.bpm,
+      rmssd: roundOrNull(signals.rmssd) ?? p.rmssd,
+      stress: roundOrNull(signals.stress) ?? p.stress,
+      fatigue: signals.facePresent ? (roundOrNull(signals.fatigueScore) ?? p.fatigue) : p.fatigue,
+      blinks: Math.max(signals.blinks ?? 0, p.blinks),
+      suspicion: roundOrNull(integ?.suspicion) ?? p.suspicion,
+      guilt: roundOrNull(integ?.guilt) ?? p.guilt,
+      tells: roundOrNull(integ?.tells) ?? p.tells,
+      masking: roundOrNull(integ?.masking) ?? p.masking,
+      label: integ?.label ?? p.label,
+      confidence: roundOrNull(integ?.confidence) ?? p.confidence,
+      emotion: signals.emotion ?? p.emotion,
+    }));
+  }, [signals, integ]);
 
   // Record the suspicion score into a rolling timeline while a face is tracked.
   useEffect(() => {
@@ -124,17 +155,17 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
           <div className="text-xs text-faint">experimental suspicion meter - {subject}</div>
 
           <div className="my-4 flex items-center justify-center">
-            <Gauge value={integ?.suspicion} label={integ?.label} />
+            <Gauge value={d.suspicion ?? undefined} label={d.label ?? undefined} />
           </div>
 
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Mini k="Guilt" v={integ?.guilt} />
-            <Mini k="Tells" v={integ?.tells} />
-            <Mini k="Masking" v={integ?.masking} />
+            <Mini k="Guilt" v={d.guilt ?? undefined} />
+            <Mini k="Tells" v={d.tells ?? undefined} />
+            <Mini k="Masking" v={d.masking ?? undefined} />
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs">
             <span className="text-muted">Signal confidence</span>
-            <span className="mono font-bold">{formatScore100(integ?.confidence)}</span>
+            <span className="mono font-bold">{formatScore100(d.confidence)}</span>
           </div>
           <button
             onClick={capture}
@@ -178,24 +209,24 @@ export default function EmoteAnalyzer({ subject = "subject" }: { subject?: strin
 
       {/* Vitals + emotion */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Vital k="Heart rate" v={displayVital(signals.bpm)} unit="BPM" />
-        <Vital k="HRV (RMSSD)" v={displayVital(signals.rmssd)} unit="ms" sub="est." />
-        <Vital k="Stress / arousal" v={formatScore100(signals.stress)} unit="" />
-        <Vital k="Fatigue" v={signals.facePresent ? formatScore100(signals.fatigueScore) : EMPTY} unit="" sub={`${signals.blinks} blinks`} />
+        <Vital k="Heart rate" v={displayVital(d.bpm)} unit="BPM" />
+        <Vital k="HRV (RMSSD)" v={displayVital(d.rmssd)} unit="ms" sub="est." />
+        <Vital k="Stress / arousal" v={formatScore100(d.stress)} unit="" />
+        <Vital k="Fatigue" v={formatScore100(d.fatigue)} unit="" sub={`${d.blinks} blinks`} />
       </div>
 
       <div className="card p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-xs font-bold uppercase tracking-[0.15em] text-primary">Expression read</div>
-          {signals.emotion && (
+          {d.emotion && (
             <span className="chip capitalize">
-              {signals.emotion.dominant} - {(signals.emotion.confidence * 100).toFixed(0)}%
+              {d.emotion.dominant} - {Math.round(d.emotion.confidence * 100)}%
             </span>
           )}
         </div>
         <div className="space-y-1.5">
           {EMOTION_ORDER.map((e) => {
-            const p = signals.emotion?.probabilities?.[e] ?? 0;
+            const p = d.emotion?.probabilities?.[e] ?? 0;
             return (
               <div key={e} className="flex items-center gap-2 text-xs">
                 <span className="w-16 capitalize text-muted">{e}</span>

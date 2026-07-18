@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function TerminalPage() {
   return (
-    <main className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6">
+    <main className="px-4 py-8 sm:px-6">
       <SectionHeading
         eyebrow="Trading Tools & Agents"
         title="Sentinel"
