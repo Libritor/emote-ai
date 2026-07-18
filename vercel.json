@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "build": { "env": { "NEXT_PUBLIC_TRACK": "matchday" } }
+}
