@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useBoard, type BoardItem } from "@/lib/hooks";
 import { Flag, StatusChip, StageChip } from "@/components/ui";
 import { kickoffLabel, relativeKickoff } from "@/lib/format";
+import { matchSuspicion, labelColor } from "@/lib/emote/integrity";
 
 type Tab = "live" | "upcoming" | "results";
 
@@ -83,6 +84,7 @@ function MatchRow({ item }: { item: BoardItem }) {
         <div className="mb-2 flex items-center gap-2">
           <StageChip fixture={f} />
           <StatusChip fixture={f} />
+          <IntegrityChip id={f.id} />
           <span className="hidden text-xs text-faint sm:inline">
             {f.status === "scheduled" ? `${kickoffLabel(f.kickoff)} · ${relativeKickoff(f.kickoff)}` : f.venue}
           </span>
@@ -101,6 +103,20 @@ function MatchRow({ item }: { item: BoardItem }) {
         </div>
       )}
     </Link>
+  );
+}
+
+function IntegrityChip({ id }: { id: number }) {
+  const { score, label } = matchSuspicion(id);
+  return (
+    <span
+      className="chip"
+      title={`Emote AI integrity signal: ${label} (${score}/100) — experimental`}
+      style={{ color: labelColor(label), borderColor: "currentColor" }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: labelColor(label) }} />
+      {score}
+    </span>
   );
 }
 
