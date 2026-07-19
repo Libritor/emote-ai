@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useOnchain } from "@/lib/solana/useOnchain";
 import { isProgramConfigured } from "@/lib/solana/config";
 import { useBoard } from "@/lib/hooks";
+import { useFeedClock } from "@/lib/feedClock";
+import SimulateFeedPrompt from "@/components/SimulateFeedPrompt";
 import { Flag } from "@/components/ui";
 import { formatScoreline, kickoffLabel, relativeKickoff } from "@/lib/format";
 import type { Outcome1x2 } from "@/lib/txodds/types";
@@ -21,7 +23,9 @@ const LEADERBOARD = [
 ];
 
 export default function MatchDay() {
-  const { items, loading, error } = useBoard(15000);
+  const { items, loading, error, clockMs } = useBoard(15000);
+  const { asOfMs } = useFeedClock();
+  const displayNow = asOfMs ?? clockMs ?? 0;
   const { connected, placePick } = useOnchain();
   const [picks, setPicks] = useState<Picks>(() => {
     if (typeof window === "undefined") return {};
@@ -38,10 +42,10 @@ export default function MatchDay() {
   const upcoming = useMemo(
     () =>
       items
-        .filter((i) => i.fixture.status !== "final")
+        .filter((i) => i.fixture.status === "live" || (i.fixture.status === "scheduled" && +new Date(i.fixture.kickoff) >= displayNow))
         .sort((a, b) => +new Date(a.fixture.kickoff) - +new Date(b.fixture.kickoff))
         .slice(0, 8),
-    [items],
+    [displayNow, items],
   );
   const settled = useMemo(() => items.filter((i) => i.fixture.status === "final"), [items]);
 
@@ -117,7 +121,7 @@ export default function MatchDay() {
               <div className="card py-12 text-center text-muted">Unable to load fixtures.</div>
             )}
             {!loading && !error && upcoming.length === 0 && (
-              <div className="card py-12 text-center text-muted">No open picks right now.</div>
+              <SimulateFeedPrompt />
             )}
             {upcoming.map((i) => {
               const f = i.fixture;
@@ -126,7 +130,7 @@ export default function MatchDay() {
                 <div key={f.id} className="card p-3.5">
                   <div className="mb-2 flex items-center justify-between text-xs text-faint">
                     <span>{f.group ? `Group ${f.group}` : f.round}</span>
-                    <span>{kickoffLabel(f.kickoff)} · {relativeKickoff(f.kickoff)}</span>
+                    <span>{kickoffLabel(f.kickoff)} · {relativeKickoff(f.kickoff, displayNow)}</span>
                   </div>
                   <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                     <div className="space-y-1">

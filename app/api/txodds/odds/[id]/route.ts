@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { getTxOdds } from "@/lib/txodds";
+import { parseAsOf, providerForRequest, withLiveFallback } from "@/lib/txodds/request";
 
 // GET /api/txodds/odds/:id -> market odds (1X2 + O/U 2.5) and margin-free fair probs.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: RouteContext<"/api/txodds/odds/[id]">,
 ) {
   const { id } = await ctx.params;
@@ -12,15 +12,19 @@ export async function GET(
     return Response.json({ error: "invalid id" }, { status: 400 });
   }
 
-  const provider = getTxOdds();
-  const [odds, fair, fixture] = await Promise.all([
-    provider.getOdds(fixtureId),
-    provider.getFairProbabilities(fixtureId),
-    provider.getFixture(fixtureId),
-  ]);
+  const { asOf, provider } = providerForRequest(parseAsOf(req.nextUrl.searchParams));
+  const result = await withLiveFallback(asOf, provider, async (activeProvider) => {
+    const [odds, fair, fixture] = await Promise.all([
+      activeProvider.getOdds(fixtureId),
+      activeProvider.getFairProbabilities(fixtureId),
+      activeProvider.getFixture(fixtureId),
+    ]);
+    return { odds, fair, fixture };
+  }, (value) => !value.odds || !value.fixture);
+  const { odds, fair, fixture } = result.value;
   if (!odds || !fixture) {
     return Response.json({ error: "not found" }, { status: 404 });
   }
 
-  return Response.json({ mode: provider.mode, fixture, odds, fair });
+  return Response.json({ mode: result.provider.mode, asOf, fixture, odds, fair });
 }

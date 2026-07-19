@@ -1,32 +1,21 @@
-# TxLINE API — endpoints used by Emote AI
+# TxLINE feedback (Emote AI)
 
-Live data layer for the markets board, the Sentinel trading agent, the on-chain
-integrity oracle, and the Verify page. The app talks to TxLINE exclusively from
-the server (`lib/txline/client.ts`); the browser never sees credentials.
+Our team appreciated TxLINE’s fast, structured match data and its ability to provide a shared source of truth for scores, fixtures, and StablePrice odds. Fixtures, odds, and scores snapshots gave Emote Insight a consistent contract across Integrity Markets, the Integrity Room, Sentinel, and the on-chain integrity oracle. That shared feed let us connect video-based player signals (heart rate, stress, fatigue, expression) with objective moments on the pitch, and explore how player state correlates with match momentum and outcomes.
 
-Hosts: mainnet `https://txline.txodds.com` - devnet `https://txline-dev.txodds.com`
+Our main friction was the initial onboarding process. Understanding the Solana wallet requirements, activating access (`guest` JWT → on-chain `subscribe` → `POST /api/token/activate`), configuring the correct network and env (`TXLINE_JWT`, `TXLINE_API_TOKEN`, `TXODDS_MODE`), and identifying the most relevant endpoints took some experimentation. Testing real-time behaviour outside active match windows was also challenging, so we built a time-travel “Simulate matchday” layer on top of live snapshots. Clearer sample payloads and official simulated match streams would make prototyping even easier.
+
+Overall, TxLINE gave us a strong real-time data foundation and opened up compelling possibilities for combining sports data with human-centred AI.
+
+---
+
+## Endpoints we used
+
+Hosts: mainnet `https://txline.txodds.com` · devnet `https://txline-dev.txodds.com`
 (same paths on both; pick ONE network for the whole credential chain).
 
-## How easy it is to integrate and reuse
+The app talks to TxLINE only from the server (`lib/txline/client.ts`); the browser never sees credentials.
 
-Auth is a one-time wallet flow; after that, every surface shares the same thin
-client and provider - no per-feature wiring.
-
-1. **One-time credentials** - Run `/setup/txline` (or `scripts/txline/activate.mjs`),
-   drop `TXLINE_JWT` + `TXLINE_API_TOKEN` into `.env.local`, set `TXODDS_MODE=live`.
-2. **Thin HTTP client** - `lib/txline/client.ts` is four typed helpers
-   (`fetchFixturesSnapshot`, `fetchOddsSnapshot`, `fetchScoresSnapshot`,
-   `fetchScoresUpdates`). Headers and origin come from env automatically.
-3. **One app contract** - `LiveTxOddsProvider` maps TxLINE payloads onto
-   `TxOddsProvider`. Callers use `getTxOdds()` and never touch raw TxLINE shapes.
-4. **Reuse everywhere** - Markets board, Sentinel agent, Verify page, and the
-   on-chain relayer all import the same `getTxOdds()`. A new route is typically
-   `const provider = getTxOdds()` plus the method you need.
-5. **Mock ↔ live flip** - Unset or change `TXODDS_MODE` to leave live mode and
-   the identical interface serves the mock provider - useful for local UI work
-   without TxLINE reachability.
-
-## Authentication (one-time, wallet-signed)
+### Authentication (one-time, wallet-signed)
 
 | # | Endpoint | Purpose | Where in code |
 |---|----------|---------|---------------|
@@ -38,7 +27,7 @@ Every data request then carries BOTH headers:
 `Authorization: Bearer <jwt>` and `X-Api-Token: <token>`.
 Free service levels: mainnet `1` (60s delay) / `12` (real-time); devnet `1`.
 
-## Data endpoints (per request path)
+### Data endpoints
 
 | Endpoint | Purpose | Where in code |
 |----------|---------|---------------|
@@ -47,15 +36,15 @@ Free service levels: mainnet `1` (60s delay) / `12` (real-time); devnet `1`.
 | `GET /api/odds/snapshot/{fixtureId}?asOf=<kickoff-60s>` | Closing line for already-played fixtures (no live 5-min window) | same, fallback branch |
 | `GET /api/scores/snapshot/{fixtureId}` | Latest score events → status (StatusId phase, incl. `game_finalised`=100), goals (`Stats["1"]/["2"]`), shootout goals (`6001/6002`), match clock | `stateFromScores` (`lib/txodds/live.ts`) → fixture status/score/minute/outcome, oracle settlement |
 
-## Payload facts we rely on (probe-verified)
+### Payload facts we rely on (probe-verified)
 
-- 1X2 market: `SuperOddsType = "1X2_PARTICIPANT_RESULT"`, `PriceNames = ["part1","draw","part2"]` — participant-relative, oriented to home/away via the fixture's `Participant1IsHome`.
+- 1X2 market: `SuperOddsType = "1X2_PARTICIPANT_RESULT"`, `PriceNames = ["part1","draw","part2"]` - participant-relative, oriented to home/away via the fixture's `Participant1IsHome`.
 - Totals: `SuperOddsType = "OVERUNDER_PARTICIPANT_GOALS"`, `MarketParameters = "line=2.5"`.
 - Full-time markets carry no `MarketPeriod`; halves arrive as `"half=1"`.
 - `Prices` are demargined decimal odds ×1000 (`Bookmaker = "TXLineStablePriceDemargined"`), so `Pct` ≈ 100/odds and the overround ≈ 1.0.
-- Scores payloads are PascalCase (unlike the OpenAPI YAML) and the snapshot returns one latest event per action type; post-match `action_amend` events can carry a stale `StatusId` with a higher `Seq` than the final whistle — the provider takes the MAX StatusId over regular phases.
+- Scores payloads are PascalCase (unlike the OpenAPI YAML) and the snapshot returns one latest event per action type; post-match `action_amend` events can carry a stale `StatusId` with a higher `Seq` than the final whistle - the provider takes the MAX StatusId over regular phases.
 
-## Credentials / env
+### Credentials / env
 
 ```
 TXODDS_MODE=live
@@ -68,13 +57,13 @@ Obtain via the Phantom flow at `/setup/txline`, or headless:
 `node scripts/txline/activate.mjs --network devnet|mainnet` (mainnet needs the
 printed address funded with ~0.003 SOL; the tier itself is free).
 
-## Roadmap (not yet integrated)
+### Roadmap (not yet integrated)
 
 - SSE streams `GET /api/odds/stream`, `GET /api/scores/stream` (sub-second updates; we poll snapshots with a 15s cache instead).
-- Merkle proof endpoints `GET /api/fixtures/validation`, `GET /api/odds/validation`, `GET /api/scores/stat-validation` + on-chain `validate_*` instructions — natural extension of the `/verify` page.
+- Merkle proof endpoints `GET /api/fixtures/validation`, `GET /api/odds/validation`, `GET /api/scores/stat-validation` + on-chain `validate_*` instructions - natural extension of the `/verify` page.
 
 ### Local-dev note
 
 Corporate OpenDNS blocks `*.txodds.com` (betting category). Local development
 pins the hosts in `/etc/hosts` (entries marked "TxLINE hackathon", added Jul 18,
-2026 — remove after the event). Deployed environments are unaffected.
+2026 - remove after the event). Deployed environments are unaffected.

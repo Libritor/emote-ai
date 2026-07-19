@@ -20,6 +20,16 @@ export function getTxOdds(): TxOddsProvider {
   return singleton;
 }
 
+export function getTxOddsAt(asOfMs: number): TxOddsProvider {
+  return process.env.TXODDS_MODE === "live"
+    ? new LiveTxOddsProvider(() => asOfMs)
+    : new MockTxOddsProvider(() => asOfMs);
+}
+
+export function getMockTxOddsAt(asOfMs: number): TxOddsProvider {
+  return new MockTxOddsProvider(() => asOfMs);
+}
+
 export * from "./types";
 export { trueResult } from "./mock";
 export { TEAMS, GROUPS, teamByCode } from "./tournament";
