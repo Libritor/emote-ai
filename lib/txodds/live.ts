@@ -94,10 +94,46 @@ const NAME_ALIASES: Record<string, string> = {
   turkey: "TUR",
   czechia: "CZE",
   "czech republic": "CZE",
+  "south africa": "RSA",
+  "bosnia and herzegovina": "BIH",
+  bosnia: "BIH",
+  paraguay: "PAR",
+  haiti: "HAI",
+  iraq: "IRQ",
+  "dr congo": "COD",
+  "congo dr": "COD",
+  "democratic republic of the congo": "COD",
+  "democratic republic of congo": "COD",
+  curacao: "CUW",
+  "cabo verde": "CPV",
+  "cape verde": "CPV",
+  jordan: "JOR",
+  uzbekistan: "UZB",
 };
 
+/**
+ * Real WC 2026 nations absent from the mock TEAMS table. Without these the
+ * live feed falls back to a white-flag synthetic and ticker/board flags break.
+ */
+const LIVE_ONLY_TEAMS: Team[] = [
+  { code: "RSA", name: "South Africa", flag: "🇿🇦", group: "A", elo: 1680 },
+  { code: "CZE", name: "Czechia", flag: "🇨🇿", group: "A", elo: 1780 },
+  { code: "BIH", name: "Bosnia and Herzegovina", flag: "🇧🇦", group: "B", elo: 1700 },
+  { code: "PAR", name: "Paraguay", flag: "🇵🇾", group: "D", elo: 1720 },
+  { code: "HAI", name: "Haiti", flag: "🇭🇹", group: "C", elo: 1580 },
+  { code: "TUR", name: "Türkiye", flag: "🇹🇷", group: "D", elo: 1760 },
+  { code: "IRQ", name: "Iraq", flag: "🇮🇶", group: "I", elo: 1650 },
+  { code: "COD", name: "DR Congo", flag: "🇨🇩", group: "", elo: 1660 },
+  { code: "CUW", name: "Curaçao", flag: "🇨🇼", group: "E", elo: 1520 },
+  { code: "CPV", name: "Cape Verde", flag: "🇨🇻", group: "H", elo: 1600 },
+  { code: "JOR", name: "Jordan", flag: "🇯🇴", group: "J", elo: 1620 },
+  { code: "UZB", name: "Uzbekistan", flag: "🇺🇿", group: "K", elo: 1640 },
+];
+
+const ALL_TEAMS: Team[] = [...TEAMS, ...LIVE_ONLY_TEAMS];
+const TEAM_BY_CODE = new Map(ALL_TEAMS.map((t) => [t.code, t]));
 const TEAM_BY_NORMALIZED_NAME = new Map<string, Team>(
-  TEAMS.map((t) => [normalizeName(t.name), t]),
+  ALL_TEAMS.map((t) => [normalizeName(t.name), t]),
 );
 
 const syntheticTeams = new Map<string, Team>();
@@ -106,9 +142,11 @@ const warnedTeams = new Set<string>();
 function resolveTeam(feedName: string): Team {
   const norm = normalizeName(feedName);
   const aliased = NAME_ALIASES[norm];
-  const known = aliased
-    ? TEAMS.find((t) => t.code === aliased)
-    : TEAM_BY_NORMALIZED_NAME.get(norm);
+  if (aliased) {
+    const byCode = TEAM_BY_CODE.get(aliased);
+    if (byCode) return byCode;
+  }
+  const known = TEAM_BY_NORMALIZED_NAME.get(norm);
   if (known) return known;
 
   let synthetic = syntheticTeams.get(norm);
