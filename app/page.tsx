@@ -119,7 +119,10 @@ export default function Home() {
 
       <p className="mt-16 text-sm text-faint">
         Detection is real (rPPG/HRV/EAR/expression); the integrity score is an
-        experimental heuristic for entertainment, shown separately from the on-chain result hash.
+        experimental heuristic for entertainment, shown separately from the on-chain result hash.{" "}
+        <Link href="/wiki" className="text-muted hover:text-primary">
+          Methods &amp; research →
+        </Link>
       </p>
     </main>
   );

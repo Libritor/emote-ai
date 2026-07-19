@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function SiteFooter() {
   const year: number = new Date().getFullYear();
   return (
@@ -6,6 +8,9 @@ export default function SiteFooter() {
         <span>© {year} Emote AI</span>
         <span>TxODDS × Solana World Cup prototype</span>
         <span>Devnet only</span>
+        <Link href="/wiki" className="hover:text-ink">
+          Wiki · methods &amp; research
+        </Link>
       </div>
     </footer>
   );

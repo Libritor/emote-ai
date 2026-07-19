@@ -17,6 +17,7 @@ const NAV = [
   { href: "/matchday", label: "Room" },
   { href: "/terminal", label: "Sentinel" },
   { href: "/verify", label: "Verify" },
+  { href: "/wiki", label: "Wiki" },
 ];
 
 export default function SiteHeader() {
