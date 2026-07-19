@@ -7,8 +7,11 @@ import { formatScoreline } from "@/lib/format";
 
 export default function LiveTicker() {
   const { fixtures, mode, loading, error } = useFixtures(12000);
+  const now = Date.now();
   const live = fixtures.filter((f) => f.status === "live");
-  const upcoming = fixtures.filter((f) => f.status === "scheduled").slice(0, 8);
+  const upcoming = fixtures
+    .filter((f) => f.status === "scheduled" && +new Date(f.kickoff) >= now)
+    .slice(0, 8);
   const items = [...live, ...upcoming];
 
   if (items.length === 0) {
