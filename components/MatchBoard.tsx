@@ -15,8 +15,9 @@ export default function MatchBoard() {
 
   const groups = useMemo(() => {
     const live = items.filter((i) => i.fixture.status === "live");
+    const now = Date.now();
     const upcoming = items
-      .filter((i) => i.fixture.status === "scheduled")
+      .filter((i) => i.fixture.status === "scheduled" && +new Date(i.fixture.kickoff) >= now)
       .sort((a, b) => +new Date(a.fixture.kickoff) - +new Date(b.fixture.kickoff));
     const results = items
       .filter((i) => i.fixture.status === "final")

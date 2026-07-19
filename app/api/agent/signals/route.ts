@@ -11,7 +11,11 @@ export const maxDuration = 60;
 export async function GET() {
   const provider = getTxOdds();
   const fixtures = await provider.getFixtures();
-  const open = fixtures.filter((f) => f.status !== "final");
+  const now = Date.now();
+  // Skip past "scheduled" feed-gap fixtures — only live + future kickoffs are tradable.
+  const open = fixtures.filter(
+    (f) => f.status === "live" || (f.status === "scheduled" && +new Date(f.kickoff) >= now),
+  );
 
   const inputs: StrikerInput[] = [];
   for (const fixture of open) {

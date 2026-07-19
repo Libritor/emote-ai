@@ -77,8 +77,10 @@ function confidenceFor(ev: number): Signal["confidence"] {
 export function scanForEdges(inputs: StrikerInput[]): Signal[] {
   const signals: Signal[] = [];
 
+  const now = Date.now();
   for (const { fixture, oneXtwo, fair } of inputs) {
     if (fixture.status === "final") continue;
+    if (fixture.status === "scheduled" && +new Date(fixture.kickoff) < now) continue;
 
     const legs: { pick: Outcome1x2; label: string; odds: number; prob: number }[] = [
       { pick: "1", label: fixture.home.name, odds: oneXtwo.home, prob: fair.home },
