@@ -33,8 +33,8 @@ export function kickoffLabel(iso: string): string {
   });
 }
 
-export function relativeKickoff(iso: string): string {
-  const diff = new Date(iso).getTime() - Date.now();
+export function relativeKickoff(iso: string, nowMs = Date.now()): string {
+  const diff = new Date(iso).getTime() - nowMs;
   const abs = Math.abs(diff);
   const mins = Math.round(abs / 60000);
   const hrs = Math.round(mins / 60);

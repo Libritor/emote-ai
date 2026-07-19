@@ -61,6 +61,14 @@ Open [http://localhost:3000](http://localhost:3000). Camera APIs need a secure c
 
 For live TxODDS pricing, configure TxLINE credentials in `.env.local` (see [`docs/TXLINE_ENDPOINTS.md`](./docs/TXLINE_ENDPOINTS.md) and `/setup/txline`). Without live keys, the app falls back to the mock provider.
 
+## Time-travel simulation
+
+When the live feed has no open matches, the home ticker and markets board show a **Simulate matchday** picker. You can also open it anytime with **Simulate date** to test the flow while games are still available.
+
+This is still live-source driven when TxLINE is configured: the app loads real TxLINE World Cup fixtures, kickoffs, teams, odds snapshots, closing lines, and known scores, then projects the board as if the selected date/time were "now." Mock data is only used when live mode is not configured or the live fetch cannot return usable data.
+
+Past in-play score ticks are not exposed by TxLINE, so a simulated live minute uses a projected partial score from the known final score. Markets, MatchDay, Sentinel, and market detail all share the same selected timestamp until you click **Exit**.
+
 ## Docs
 
 - [`docs/SUBMISSIONS.md`](./docs/SUBMISSIONS.md) - track pitches and demo outlines

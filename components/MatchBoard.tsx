@@ -3,29 +3,51 @@
 import { useMemo, useState } from "react";
 import { useBoard, type BoardItem } from "@/lib/hooks";
 import MarketDetail from "@/components/MarketDetail";
+import SimulateFeedPrompt from "@/components/SimulateFeedPrompt";
 import { Flag, StatusChip, StageChip } from "@/components/ui";
-import { formatOdds, formatScore100, kickoffLabel, relativeKickoff } from "@/lib/format";
+import {
+  formatOdds,
+  formatScore100,
+  kickoffLabel,
+  relativeKickoff,
+} from "@/lib/format";
+import { useFeedClock } from "@/lib/feedClock";
 import { matchSuspicion, labelColor } from "@/lib/emote/integrity";
 
 type Tab = "live" | "upcoming" | "results";
 
 export default function MatchBoard() {
-  const { items, mode, loading, error } = useBoard();
+  const { items, mode, loading, error, clockMs } = useBoard();
+  const { asOfIso, asOfMs, exitSimulation, simulationLabel } = useFeedClock();
   const [tab, setTab] = useState<Tab>("upcoming");
+  const [showSimulator, setShowSimulator] = useState(false);
+  const displayNow = asOfMs ?? clockMs ?? 0;
 
   const groups = useMemo(() => {
     const live = items.filter((i) => i.fixture.status === "live");
-    const now = Date.now();
     const upcoming = items
-      .filter((i) => i.fixture.status === "scheduled" && +new Date(i.fixture.kickoff) >= now)
-      .sort((a, b) => +new Date(a.fixture.kickoff) - +new Date(b.fixture.kickoff));
+      .filter(
+        (i) =>
+          i.fixture.status === "scheduled" &&
+          +new Date(i.fixture.kickoff) >= displayNow,
+      )
+      .sort(
+        (a, b) => +new Date(a.fixture.kickoff) - +new Date(b.fixture.kickoff),
+      );
     const results = items
       .filter((i) => i.fixture.status === "final")
-      .sort((a, b) => +new Date(b.fixture.kickoff) - +new Date(a.fixture.kickoff));
+      .sort(
+        (a, b) => +new Date(b.fixture.kickoff) - +new Date(a.fixture.kickoff),
+      );
     return { live, upcoming, results };
-  }, [items]);
+  }, [displayNow, items]);
 
-  const active = tab === "live" ? groups.live : tab === "upcoming" ? groups.upcoming : groups.results;
+  const active =
+    tab === "live"
+      ? groups.live
+      : tab === "upcoming"
+        ? groups.upcoming
+        : groups.results;
 
   const TABS: { id: Tab; label: string; count: number }[] = [
     { id: "live", label: "Live", count: groups.live.length },
@@ -36,7 +58,11 @@ export default function MatchBoard() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex gap-1 rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Match board filters">
+        <div
+          className="flex gap-1 rounded-xl border border-border bg-surface p-1"
+          role="tablist"
+          aria-label="Match board filters"
+        >
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -44,19 +70,48 @@ export default function MatchBoard() {
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={`rounded-lg px-3.5 py-1.5 text-sm font-bold transition ${
-                tab === t.id ? "bg-surface-3 text-ink" : "text-muted hover:text-ink"
+                tab === t.id
+                  ? "bg-surface-3 text-ink"
+                  : "text-muted hover:text-ink"
               }`}
             >
-              {t.id === "live" && t.count > 0 && <span className="live-dot mr-1.5 inline-block" />}
+              {t.id === "live" && t.count > 0 && (
+                <span className="live-dot mr-1.5 inline-block" />
+              )}
               {t.label}
               <span className="ml-1.5 text-xs text-faint">{t.count}</span>
             </button>
           ))}
         </div>
         <span className="ml-auto chip">
-          {mode === "live" ? "Live feed" : mode === "mock" ? "Simulated feed" : "Feed"}
+          {simulationLabel
+            ? `Simulated as of ${simulationLabel}`
+            : mode === "live"
+              ? "Live feed"
+              : mode === "mock"
+                ? "Simulated feed"
+                : "Feed"}
         </span>
+        {asOfIso && (
+          <button className="chip" onClick={exitSimulation}>
+            Exit
+          </button>
+        )}
+        {!asOfIso && (
+          <button
+            className="chip"
+            onClick={() => setShowSimulator((show) => !show)}
+          >
+            Simulate date
+          </button>
+        )}
       </div>
+
+      {showSimulator && !asOfIso && (
+        <div className="mb-4">
+          <SimulateFeedPrompt onSimulate={() => setShowSimulator(false)} />
+        </div>
+      )}
 
       {error && (
         <div className="mb-3 rounded-xl border border-warn/40 bg-warn/10 px-4 py-2.5 text-xs text-warn">
@@ -65,17 +120,19 @@ export default function MatchBoard() {
       )}
 
       {loading && items.length === 0 ? (
-        <div className="card grid place-items-center py-20 text-muted">Loading the feed…</div>
-      ) : error && items.length === 0 ? (
-        <div className="card grid place-items-center py-20 text-muted">Unable to load matches.</div>
-      ) : active.length === 0 ? (
         <div className="card grid place-items-center py-20 text-muted">
-          No {tab} matches right now.
+          Loading the feed… (This may take up to 30 seconds.)
         </div>
-      ) : (
+      ) : error && items.length === 0 ? (
+        <div className="card grid place-items-center py-20 text-muted">
+          Unable to load matches.
+        </div>
+      ) : active.length === 0 && !showSimulator ? (
+        <SimulateFeedPrompt />
+      ) : active.length === 0 ? null : (
         <div className="space-y-2">
           {active.map((it) => (
-            <MatchRow key={it.fixture.id} item={it} />
+            <MatchRow key={it.fixture.id} item={it} nowMs={displayNow} />
           ))}
         </div>
       )}
@@ -83,7 +140,7 @@ export default function MatchBoard() {
   );
 }
 
-function MatchRow({ item }: { item: BoardItem }) {
+function MatchRow({ item, nowMs }: { item: BoardItem; nowMs: number }) {
   const { fixture: f, oneXtwo } = item;
   const isFinal = f.status === "final";
   const [open, setOpen] = useState(false);
@@ -100,24 +157,52 @@ function MatchRow({ item }: { item: BoardItem }) {
             <StatusChip fixture={f} />
             <IntegrityChip id={f.id} />
             <span className="hidden text-xs text-faint sm:inline">
-              {f.status === "scheduled" ? `${kickoffLabel(f.kickoff)} · ${relativeKickoff(f.kickoff)}` : f.venue}
+              {f.status === "scheduled"
+                ? `${kickoffLabel(f.kickoff)} · ${relativeKickoff(f.kickoff, nowMs)}`
+                : f.venue}
             </span>
           </div>
           <div className="space-y-1">
-            <TeamLine code={f.home.code} flag={f.home.flag} name={f.home.name} score={f.score?.home} dim={isFinal && f.outcome !== "1"} />
-            <TeamLine code={f.away.code} flag={f.away.flag} name={f.away.name} score={f.score?.away} dim={isFinal && f.outcome !== "2"} />
+            <TeamLine
+              code={f.home.code}
+              flag={f.home.flag}
+              name={f.home.name}
+              score={f.score?.home}
+              dim={isFinal && f.outcome !== "1"}
+            />
+            <TeamLine
+              code={f.away.code}
+              flag={f.away.flag}
+              name={f.away.name}
+              score={f.score?.away}
+              dim={isFinal && f.outcome !== "2"}
+            />
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           {oneXtwo && (
             <div className="grid w-[190px] grid-cols-3 gap-1.5 sm:w-[220px]">
-              <OddsCell label="1" value={oneXtwo.home} win={isFinal && f.outcome === "1"} />
-              <OddsCell label="X" value={oneXtwo.draw} win={isFinal && f.outcome === "X"} />
-              <OddsCell label="2" value={oneXtwo.away} win={isFinal && f.outcome === "2"} />
+              <OddsCell
+                label="1"
+                value={oneXtwo.home}
+                win={isFinal && f.outcome === "1"}
+              />
+              <OddsCell
+                label="X"
+                value={oneXtwo.draw}
+                win={isFinal && f.outcome === "X"}
+              />
+              <OddsCell
+                label="2"
+                value={oneXtwo.away}
+                win={isFinal && f.outcome === "2"}
+              />
             </div>
           )}
-          <span className="text-xs font-bold text-primary transition group-open:rotate-90">-&gt;</span>
+          <span className="text-xs font-bold text-primary transition group-open:rotate-90">
+            -&gt;
+          </span>
         </div>
       </summary>
 
@@ -138,7 +223,10 @@ function IntegrityChip({ id }: { id: number }) {
       title={`Emote AI integrity signal: ${label} (${score}/100) - experimental`}
       style={{ color: labelColor(label), borderColor: "currentColor" }}
     >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: labelColor(label) }} />
+      <span
+        className="h-1.5 w-1.5 rounded-full"
+        style={{ background: labelColor(label) }}
+      />
       Integrity {formatScore100(score)} · {label}
     </span>
   );
@@ -162,16 +250,28 @@ function TeamLine({
       <Flag code={code} flag={flag} />
       <span className="truncate font-bold">{name}</span>
       {score !== undefined && (
-        <span className="ml-auto mono text-lg font-black tabular-nums sm:ml-2">{score}</span>
+        <span className="ml-auto mono text-lg font-black tabular-nums sm:ml-2">
+          {score}
+        </span>
       )}
     </div>
   );
 }
 
-function OddsCell({ label, value, win }: { label: string; value: number; win?: boolean }) {
+function OddsCell({
+  label,
+  value,
+  win,
+}: {
+  label: string;
+  value: number;
+  win?: boolean;
+}) {
   return (
     <div className="odds" data-active={win ? "true" : "false"}>
-      <span className="text-[10px] font-bold uppercase text-faint">{label}</span>
+      <span className="text-[10px] font-bold uppercase text-faint">
+        {label}
+      </span>
       <span className="mono text-sm font-bold">{formatOdds(value)}</span>
     </div>
   );

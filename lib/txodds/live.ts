@@ -17,6 +17,7 @@ import {
   type TxOddsPayload,
   type TxScores,
 } from "../txline/client";
+import { projectFixtureAt } from "./reclock";
 import { TEAMS, outcomeProbabilities } from "./tournament";
 import type {
   FairProbabilities,
@@ -454,6 +455,8 @@ function stageFor(kickoffMs: number): { stage: StageId; round: string } {
 
 export class LiveTxOddsProvider implements TxOddsProvider {
   readonly mode = "live" as const;
+  private readonly now: () => number;
+  private readonly historicalClock: boolean;
 
   private fixturesCache: CacheEntry<Fixture[]> | null = null;
   private fixturesInflight: Promise<Fixture[]> | null = null;
@@ -465,6 +468,11 @@ export class LiveTxOddsProvider implements TxOddsProvider {
   private kickoffMsById = new Map<number, number>();
   /** Closing lines of kicked-off fixtures never change — cache for good. */
   private closingOdds = new Map<number, TxOddsPayload[]>();
+
+  constructor(now?: () => number) {
+    this.now = now ?? (() => Date.now());
+    this.historicalClock = now !== undefined;
+  }
 
   private async rawWorldCupFixtures(): Promise<TxFixture[]> {
     // The snapshot window is "start day + 30 days"; two pages cover the
@@ -491,7 +499,7 @@ export class LiveTxOddsProvider implements TxOddsProvider {
     const memo = this.finalStates.get(fx.FixtureId);
     if (memo) return memo;
 
-    const now = Date.now();
+    const now = this.now();
     const kickoff = tsToMs(fx.StartTime);
     // Scheduled fixtures before the window need no scores call.
     if (now < kickoff - LIVE_FROM_MS) return null;
@@ -541,7 +549,7 @@ export class LiveTxOddsProvider implements TxOddsProvider {
           ...(state?.score ? { score: state.score } : {}),
           ...(state?.outcome ? { outcome: state.outcome } : {}),
         };
-        return fixture;
+        return this.historicalClock ? projectFixtureAt(fixture, this.now()) : fixture;
       });
 
       fixtures.sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.id - b.id);
@@ -569,19 +577,25 @@ export class LiveTxOddsProvider implements TxOddsProvider {
 
     if (!this.kickoffMsById.has(id)) await this.getFixtures();
     const kickoff = this.kickoffMsById.get(id);
-    const longFinished = kickoff !== undefined && Date.now() > kickoff + LIVE_UNTIL_MS;
+    const now = this.now();
+    const longFinished = kickoff !== undefined && now > kickoff + LIVE_UNTIL_MS;
 
     // Long-finished fixtures have no live 5-minute window — go straight to the
     // closing line (historical snapshot just before kickoff).
-    let payloads = longFinished ? [] : await fetchOddsSnapshot(id);
-    if (payloads.length === 0 && kickoff && kickoff < Date.now()) {
+    const snapshotAt = kickoff !== undefined && longFinished ? kickoff - 60_000 : now;
+    let payloads = this.historicalClock
+      ? await fetchOddsSnapshot(id, snapshotAt)
+      : longFinished
+        ? []
+        : await fetchOddsSnapshot(id);
+    if (payloads.length === 0 && kickoff && kickoff < now) {
       payloads = await fetchOddsSnapshot(id, kickoff - 60_000);
       if (payloads.length > 0) {
-        this.closingOdds.set(id, payloads);
+        if (!this.historicalClock) this.closingOdds.set(id, payloads);
         return payloads;
       }
     }
-    this.oddsCache.set(id, { at: Date.now(), value: payloads });
+    if (!this.historicalClock) this.oddsCache.set(id, { at: Date.now(), value: payloads });
     return payloads;
   }
 

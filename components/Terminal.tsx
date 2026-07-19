@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Signal, AgentSummary } from "@/lib/agent/striker";
 import { Stat } from "@/components/ui";
+import { useFeedClock } from "@/lib/feedClock";
 import { EMPTY, formatOdds, formatProbability, formatSignedPct } from "@/lib/format";
 
 interface Position {
@@ -17,6 +18,7 @@ interface Position {
 }
 
 export default function Terminal() {
+  const { asOfMs, querySuffix, ready, simulationLabel } = useFeedClock();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [summary, setSummary] = useState<AgentSummary | null>(null);
   const [mode, setMode] = useState<string>("…");
@@ -30,32 +32,43 @@ export default function Terminal() {
     setLog((l) => [`${new Date().toLocaleTimeString()}  ${line}`, ...l].slice(0, 60));
   }, []);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/agent/signals", { cache: "no-store" });
-      if (!res.ok) throw new Error(`signals ${res.status}`);
-      const data = await res.json();
-      setSignals(data.signals);
-      setSummary(data.summary);
-      setMode(data.mode);
-      setError(null);
-      return data.signals as Signal[];
-    } catch (e) {
-      setError((e as Error).message);
-      return [] as Signal[];
-    }
-  }, []);
-
   useEffect(() => {
-    const initial = setTimeout(() => {
-      load().then((s) => pushLog(`Scanned feed - ${s.length} live edges detected.`));
-    }, 0);
-    const t = setInterval(load, 12000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(t);
+    if (!ready) return;
+
+    let cancelled = false;
+    const expectedSuffix = querySuffix;
+
+    const load = async (): Promise<Signal[]> => {
+      try {
+        const res = await fetch(`/api/agent/signals${expectedSuffix}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`signals ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return [] as Signal[];
+        setSignals(data.signals);
+        setSummary(data.summary);
+        setMode(data.mode);
+        setError(null);
+        return data.signals as Signal[];
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+        return [] as Signal[];
+      }
     };
-  }, [load, pushLog]);
+
+    const start = setTimeout(() => {
+      void load().then((s) => {
+        if (!cancelled) pushLog(`Scanned feed - ${s.length} live edges detected.`);
+      });
+    }, 0);
+
+    const interval = asOfMs === null ? setInterval(() => void load(), 12000) : undefined;
+
+    return () => {
+      cancelled = true;
+      clearTimeout(start);
+      if (interval) clearInterval(interval);
+    };
+  }, [asOfMs, pushLog, querySuffix, ready]);
 
   // Auto-execute: book the strongest fresh edges into the blotter.
   useEffect(() => {
@@ -94,6 +107,7 @@ export default function Terminal() {
             <div className="font-black">Sentinel</div>
             <div className="text-xs text-muted">
               Autonomous edge-taking agent - {mode === "live" ? "live feed" : mode === "mock" ? "simulated feed" : "feed unavailable"}
+              {simulationLabel ? ` as of ${simulationLabel}` : ""}
             </div>
           </div>
         </div>

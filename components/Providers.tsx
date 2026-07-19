@@ -5,6 +5,7 @@ import { Buffer } from "buffer";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
+import { FeedClockProvider } from "@/lib/feedClock";
 import { SOLANA_RPC } from "@/lib/solana/config";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -24,7 +25,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <ConnectionProvider endpoint={SOLANA_RPC}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
-          <div className="flex min-h-dvh flex-col">{children}</div>
+          <FeedClockProvider>
+            <div className="flex min-h-dvh flex-col">{children}</div>
+          </FeedClockProvider>
         </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
